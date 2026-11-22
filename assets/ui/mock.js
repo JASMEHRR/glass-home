@@ -73,6 +73,8 @@
     sleep: function () { console.log('[GH] sleep'); return false; },
     sleepTimer: function (m) { var at = m > 0 ? String(Date.now() + m * 60000) : ''; if (at) store['sleep.at'] = at; else delete store['sleep.at']; save(); return at; },
     openStremio: function (t, id) { console.log('[GH] stremio', t, id); return true; },
+    openStremioVideo: function (t, id, v) { console.log('[GH] stremio', t, id, v); return true; },
+    nowPlaying: function () { return JSON.stringify({ access: true, title: 'Sample song', artist: 'Sample artist', app: 'Spotify', duration: 228000, position: 102000, playing: true }); },
     media: function (a) { console.log('[GH] media', a); },
     speak: function (t) {
       if (!window.speechSynthesis) return false;

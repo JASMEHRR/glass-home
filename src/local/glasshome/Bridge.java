@@ -423,6 +423,25 @@ final class Bridge {
         if (!tmp.renameTo(f) && f.delete() && !tmp.renameTo(f)) tmp.delete();
     }
 
+    /** The song or video playing on the TV (needs music access switched on), as JSON or "". */
+    @JavascriptInterface
+    public String nowPlaying() {
+        return MusicListener.nowPlaying(a);
+    }
+
+    /** Opens a title, or the exact episode when videoId is given, in Stremio. */
+    @JavascriptInterface
+    public boolean openStremioVideo(String type, String id, String videoId) {
+        if (videoId == null || !videoId.matches("[A-Za-z0-9:._-]{1,100}") || type == null || !type.matches("movie|series")
+                || id == null || !id.matches("[A-Za-z0-9:._-]{1,80}")) {
+            return openStremio(type, id);
+        }
+        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("stremio:///detail/" + type + "/" + id + "/" + videoId))
+                .setPackage(STREMIO).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (i.resolveActivity(a.getPackageManager()) != null && start(i)) return true;
+        return openStremio(type, id);
+    }
+
     /** A QR code for text, as an SVG data URL (Project Nayuki's generator, MIT). */
     @JavascriptInterface
     public String qr(String text) {

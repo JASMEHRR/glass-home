@@ -13,8 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Settings as plain key=value lines in glass.conf (in the app's external files dir when there is
- * one, so adb push/pull can edit it). Pure Java apart from {@link #get(Context)}.
+ * Settings as plain key=value lines in glass.conf. Pure Java apart from {@link #get(Context)}.
  */
 final class Prefs {
     static final String FILE = "glass.conf";
@@ -28,12 +27,9 @@ final class Prefs {
         this.file = file;
     }
 
+    /** Kept in the app's private storage: it holds the Ascend and Stremio keys. */
     static synchronized Prefs get(Context c) {
-        if (instance == null) {
-            File dir = c.getExternalFilesDir(null);
-            if (dir == null) dir = c.getFilesDir();
-            instance = new Prefs(new File(dir, FILE));
-        }
+        if (instance == null) instance = new Prefs(new File(c.getFilesDir(), FILE));
         return instance;
     }
 

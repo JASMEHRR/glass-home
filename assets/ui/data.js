@@ -183,6 +183,42 @@
     });
   };
 
+  // ---- Stremio account: link a device, then the library for Continue watching --------------------
+  Data.stremioLink = function () {
+    return Data.json('https://link.stremio.com/api/v2/create?type=Create', '', 0).then(function (o) {
+      if (!o || !o.result || !o.result.code) throw new Error('no code');
+      return { code: o.result.code, link: o.result.link || ('https://link.stremio.com/' + o.result.code) };
+    });
+  };
+  Data.stremioLinkRead = function (code) {
+    return Data.json('https://link.stremio.com/api/v2/read?type=Read&code=' + encodeURIComponent(code), '', 0)
+      .then(function (o) { return o && o.result && o.result.authKey ? o.result.authKey : ''; });
+  };
+  function stamp(v) { return typeof v === 'number' ? v : (v ? Date.parse(v) || 0 : 0); }
+  /** Stremio's own continue-watching rule: in the library (or just watched), not live, with a position. */
+  Data.parseLibrary = function (items) {
+    return (items || []).filter(function (o) {
+      var st = o && o.state;
+      if (!st || o.type === 'other' || o.type === 'tv') return false;
+      if (o.behaviorHints && o.behaviorHints.isLive) return false;
+      return (!o.removed || o.temp) && (st.timeOffset || 0) > 0;
+    }).sort(function (a, b) { return stamp(b._mtime) - stamp(a._mtime); }).slice(0, 8).map(function (o) {
+      var st = o.state, vid = st.video_id || '', s = -1, e = -1;
+      if (vid.indexOf(o._id + ':') === 0) {
+        var parts = vid.slice(o._id.length + 1).split(':');
+        if (parts.length === 2) { s = +parts[0]; e = +parts[1]; } else if (parts.length === 1) e = +parts[0];
+      }
+      var upNext = st.timeOffset <= 1000;
+      return { id: o._id, type: o.type, name: o.name, poster: o.poster || '', videoId: vid, season: s, episode: e,
+        position: upNext ? 0 : st.timeOffset, duration: st.duration || 0, upNext: upNext };
+    });
+  };
+  Data.watching = function (key) {
+    if (!key) return Promise.resolve(null);
+    return Data.json('https://api.strem.io/api/datastoreGet', JSON.stringify({ authKey: key, collection: 'libraryItem', ids: [], all: true }), 300)
+      .then(function (o) { if (o && o.error) throw new Error(o.error.message || 'stremio'); return Data.parseLibrary(o && o.result); });
+  };
+
   // ---- Ascend (deadlines, inbox) -----------------------------------------------------------------
   /** Expects {deadlines:[{title,due,course}], inbox:[{from,subject}]} from Ascend's TV digest. */
   Data.digest = function (prefs) {

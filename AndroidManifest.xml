@@ -59,6 +59,17 @@
             </intent-filter>
         </receiver>
 
+        <!-- Lets the screensaver show the song playing on the TV. Off until switched on; reads no notifications. -->
+        <service
+            android:name=".MusicListener"
+            android:label="Glass Home music"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- HOME takeover on Fire OS 7, as in dumbtv home (MIT). Off until switched on in Accessibility. -->
         <service
             android:name=".Guard"

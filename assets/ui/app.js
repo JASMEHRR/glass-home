@@ -61,8 +61,20 @@
     live.animeState = u ? 'loading' : 'off';
     if (u) Data.anilist(u).then(function (a) { live.anime = a; live.animeState = 'ok'; paintChips(); }).catch(function () { live.animeState = 'error'; paintChips(); });
     Data.digest(P).then(function (d) { live.digest = d; paintChips(); }).catch(function () { live.digest = null; });
+    Data.watching(pref('stremio.key', '')).then(function (w) { live.watching = w; paintChips(); }).catch(function () { live.watching = null; });
     paintChips();
   }
+  var musicSeen = '';
+  function pollMusic() {
+    var raw = '';
+    try { raw = GH.nowPlaying ? GH.nowPlaying() : ''; } catch (e) { raw = ''; }
+    if (raw === musicSeen) return false;
+    musicSeen = raw;
+    try { live.music = raw ? JSON.parse(raw) : null; } catch (e) { live.music = null; }
+    return true;
+  }
+  function minutesLeft(x) { return Math.max(1, Math.round((x.duration - x.position) / 60000)); }
+  function epLabel(x) { return (x.season > 0 ? 'S' + x.season + ' ' : '') + (x.episode > 0 ? 'E' + x.episode : ''); }
 
   // ---- screens and keys ----------------------------------------------------------------------
   var S = {}, base = 'home', overlays = [];
@@ -130,7 +142,7 @@
     $('homeGreet').textContent = Data.greeting(now) + ', ' + pref('name', 'JasMehr');
     $('homeDate').textContent = Data.longDate(now);
     paintRaceCount();
-    if (top() === 'ambient') paintChipTimers();
+    if (top() === 'ambient') { paintChipTimers(); if (now.getSeconds() % 5 === 0 && pollMusic()) paintChips(); }
     if (top() === 'expanded') S.expanded.tick();
   }
   setInterval(tick, 1000);
@@ -255,9 +267,11 @@
     var w = live.weather, d = live.digest, an = live.anime;
     if (k === 'deadlines') return d && d.deadlines ? d.deadlines.length + ' due' : 'Set up';
     if (k === 'weather') return w ? w.temp + '°' : '--';
-    if (k === 'music') return 'Music';
+    if (k === 'music') return live.music && live.music.title ? (live.music.playing ? 'Playing' : 'Paused') : 'Music';
     if (k === 'anime') return an && an.length ? Data.shortLeft(an[0].at - Date.now()) : (live.animeState === 'off' ? 'Set up' : '--');
-    return 'Stremio';
+    var wt = live.watching;
+    if (wt && wt.length) return wt[0].duration ? Math.round(100 * wt[0].position / wt[0].duration) + '%' : 'Next';
+    return pref('stremio.key', '') ? 'None' : 'Link';
   }
   function chipBody(k) {
     var w = live.weather, d = live.digest, an = live.anime, h = '';
@@ -279,8 +293,16 @@
           + (w.aqi != null ? '<span>Air ' + w.aqi + '</span>' : '') + '</div>';
       } else h += '<div class="note">Loading the weather…</div>';
     } else if (k === 'music') {
-      h = '<div class="eyebrow">NOW PLAYING</div><div style="font-weight:800;font-size:28px;margin-top:12px">Nothing playing</div>'
-        + '<div class="note">Songs playing on the TV show here once music access is switched on.</div>';
+      var mu = live.music;
+      h = '<div class="eyebrow">NOW PLAYING</div>';
+      if (mu && mu.title) {
+        h += '<div style="font-weight:800;font-size:28px;margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(mu.title) + '</div>'
+          + '<div class="note" style="margin-top:4px">' + esc([mu.artist, mu.app].filter(Boolean).join(' · ')) + '</div>'
+          + (mu.duration ? '<div class="bar"><i style="width:' + Math.min(100, Math.round(100 * mu.position / mu.duration)) + '%"></i></div>' : '');
+      } else {
+        h += '<div style="font-weight:800;font-size:28px;margin-top:12px">Nothing playing</div>'
+          + '<div class="note">' + (mu && mu.access ? 'Play a song in any app and it shows here.' : 'Songs playing on the TV show here once music access is switched on.') + '</div>';
+      }
     } else if (k === 'anime') {
       h = '<div class="eyebrow">NEXT EPISODES · ANILIST</div>';
       if (an && an.length) {
@@ -291,7 +313,16 @@
         h += '<div class="note">Add your AniList name from the phone page and your next episodes show up here.</div>';
       } else h += '<div class="note">' + (live.animeState === 'loading' ? 'Loading your list…' : 'No upcoming episodes on your list.') + '</div>';
     } else {
-      h = '<div class="eyebrow">CONTINUE WATCHING · STREMIO</div><div class="note">Link your Stremio account and what you are part way through shows up here.</div>';
+      var wt = live.watching;
+      h = '<div class="eyebrow">CONTINUE WATCHING · STREMIO</div>';
+      if (wt && wt.length) {
+        var x = wt[0];
+        h += '<div style="font-weight:800;font-size:28px;margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(x.name) + '</div>'
+          + '<div class="note" style="margin-top:4px">' + esc([epLabel(x), x.upNext ? 'Up next' : minutesLeft(x) + ' min left'].filter(Boolean).join(' · ')) + '</div>'
+          + (x.duration ? '<div class="bar"><i style="width:' + Math.round(100 * x.position / x.duration) + '%;background:#67e8f9"></i></div>' : '');
+      } else {
+        h += '<div class="note">' + (pref('stremio.key', '') ? 'Nothing part way through right now.' : 'Link Stremio in Home settings, Accounts, and what you are part way through shows up here.') + '</div>';
+      }
     }
     return h;
   }
@@ -352,8 +383,43 @@
   // ---- Expanded view ---------------------------------------------------------------------------
   var E = { k: null };
   S.expanded = E;
-  E.enter = function (k) { E.k = k || E.k; E.render(); };
-  E.tick = function () { paintChipTimers(); };
+  E.enter = function (k) {
+    E.k = k || E.k;
+    if (E.k === 'music') pollMusic();
+    if (E.k === 'stremio') E.startLink();
+    E.render();
+  };
+  E.leave = function () { clearInterval(E.pollT); E.link = null; };
+  E.tick = function () { paintChipTimers(); if (E.k === 'music' && new Date().getSeconds() % 3 === 0 && pollMusic()) E.render(); };
+  E.key = function (k) {
+    if (E.k === 'watching' && k === 'ok' && live.watching && live.watching[0]) {
+      var x = live.watching[0];
+      GH.openStremioVideo(x.type, x.id, x.videoId);
+    } else if (E.k === 'music') {
+      GH.media(k === 'ok' ? 'play_pause' : k === 'left' ? 'previous' : k === 'right' ? 'next' : '');
+      setTimeout(function () { if (pollMusic()) E.render(); }, 800);
+    }
+  };
+  /** Stremio's "link a device": show a code, wait for the phone to approve it, keep the key. */
+  E.startLink = function () {
+    clearInterval(E.pollT);
+    E.link = null; E.linkMsg = '';
+    Data.stremioLink().then(function (l) {
+      E.link = l; E.render();
+      var started = Date.now();
+      E.pollT = setInterval(function () {
+        if (Date.now() - started > 5 * 60000) { clearInterval(E.pollT); E.startLink(); return; }
+        Data.stremioLinkRead(l.code).then(function (key) {
+          if (!key) return;
+          clearInterval(E.pollT);
+          setPref('stremio.key', key);
+          E.link = null; E.linkMsg = 'Linked. Continue watching now follows your Stremio library.';
+          E.render();
+          refreshData();
+        }).catch(function () { /* keep waiting */ });
+      }, 3000);
+    }).catch(function () { E.linkMsg = 'Could not reach Stremio. Check the internet and try again.'; E.render(); });
+  };
   E.render = function () {
     var k = E.k, w = live.weather, d = live.digest, an = live.anime, src = '', h = '';
     if (k === 'deadlines') {
@@ -374,7 +440,17 @@
       } else h = '<div class="empty">Loading the weather…</div>';
     } else if (k === 'music') {
       src = 'on the TV';
-      h = '<div class="empty">Nothing is playing right now. Songs from any app on the TV show here, with play, pause and skip, once music access is switched on for Glass Home.</div>';
+      var mu = live.music;
+      h = mu && mu.title
+        ? '<div style="font-weight:800;font-size:34px;margin-top:24px">' + esc(mu.title) + '</div><div style="font-size:21px;color:rgba(255,255,255,.72);margin-top:6px">' + esc([mu.artist, mu.album, mu.app].filter(Boolean).join(' · ')) + '</div>'
+          + (mu.duration ? '<div class="bar" style="margin-top:28px"><i style="width:' + Math.min(100, Math.round(100 * mu.position / mu.duration)) + '%"></i></div>' : '')
+          + '<div class="empty" style="font-size:18px">OK: play or pause. Left and right: previous and next.</div>'
+        : '<div class="empty">Nothing is playing right now. Songs from any app on the TV show here, with play, pause and skip, once music access is switched on for Glass Home.</div>';
+    } else if (k === 'stremio') {
+      src = 'link.stremio.com';
+      h = E.link ? '<div style="display:flex;gap:30px;align-items:center;margin-top:26px"><img src="' + esc(GH.qr(E.link.link) || '') + '" alt="" style="width:200px;height:200px;border-radius:18px;background:#fff;padding:8px">'
+        + '<div style="font-size:22px;line-height:1.55;color:rgba(255,255,255,.85)">Scan this with your phone, or open <b>link.stremio.com</b> and enter<div style="font-family:Outfit,sans-serif;font-size:56px;letter-spacing:.12em;margin-top:8px">' + esc(E.link.code) + '</div>Sign in there and this TV links by itself.</div></div>'
+        : '<div class="empty">' + esc(E.linkMsg || 'Getting a code from Stremio…') + '</div>';
     } else if (k === 'anime') {
       src = 'your AniList';
       if (an && an.length) {
@@ -384,9 +460,15 @@
       } else h = '<div class="empty">' + (live.animeState === 'off' ? 'Add your AniList user name from the phone page. Your watching and planning lists then show their next episodes here.' : 'No upcoming episodes on your list right now.') + '</div>';
     } else {
       src = 'Stremio';
-      h = '<div class="empty">Link your Stremio account from Home settings and the shows and films you are part way through appear here, ready to resume.</div>';
+      var wt = live.watching;
+      h = wt && wt.length ? '<div class="list">' + wt.slice(0, 4).map(function (x, i) {
+        return '<div class="it"' + (i === 0 ? ' style="margin-top:14px;border-radius:20px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3)"' : '') + '><img class="cover" src="' + esc(x.poster) + '" alt=""><span style="flex:1;min-width:0">' + esc(x.name)
+          + '<small>' + esc([epLabel(x), x.upNext ? 'Up next' : minutesLeft(x) + ' min left'].filter(Boolean).join(' · ')) + '</small>'
+          + (x.duration ? '<span class="bar" style="display:block;margin-top:8px;height:4px"><i style="height:4px;width:' + Math.round(100 * x.position / x.duration) + '%;background:#67e8f9"></i></span>' : '') + '</span></div>';
+      }).join('') + '</div><div class="empty" style="font-size:18px;margin-top:16px">OK resumes the first one in Stremio.</div>'
+        : '<div class="empty">Link your Stremio account from Home settings and the shows and films you are part way through appear here, ready to resume.</div>';
     }
-    var title = { deadlines: 'DEADLINES', weather: 'WEATHER', music: 'NOW PLAYING', anime: 'NEXT EPISODES', watching: 'CONTINUE WATCHING' }[k] || '';
+    var title = { deadlines: 'DEADLINES', weather: 'WEATHER', music: 'NOW PLAYING', anime: 'NEXT EPISODES', watching: 'CONTINUE WATCHING', stremio: 'LINK STREMIO' }[k] || '';
     $('expPanel').innerHTML = '<div class="top"><span class="eyebrow">' + title + '</span><span class="src">' + esc(src) + '</span></div>' + h;
     paintChipTimers();
   };
@@ -665,7 +747,12 @@
         { lbl: 'BRAIN' }, { b: 'Ascend Jarvis', s: pref('ascend.url', '') ? 'Connected for questions and Muse tasks' : 'Set the Ascend address and TV key on the phone page', val: pref('ascend.url', '') ? 'On' : 'Not set' }];
     } },
     { name: 'Accounts', icon: I.user, rows: function () {
-      return [{ lbl: 'SET THESE ON THE PHONE PAGE' },
+      return [{ lbl: 'ON THIS TV' },
+        { b: 'Stremio', s: 'For Continue watching. Links with a code, no password here', val: pref('stremio.key', '') ? 'Linked' : 'Link now', a: function () {
+          if (pref('stremio.key', '')) { setPref('stremio.key', ''); live.watching = null; T.render(); paintChips(); return; }
+          go('expanded', 'stremio');
+        } },
+        { lbl: 'SET THESE ON THE PHONE PAGE' },
         { b: 'AniList', s: 'For your next episodes', val: pref('anilist.user', 'Not set') },
         { b: 'Ascend', s: 'Deadlines from Muse, and Jarvis\'s brain', val: pref('ascend.url', '') ? 'Linked' : 'Not set' },
         { b: 'Weather place', s: 'Found from your internet connection unless set', val: pref('weather.lat', '') ? 'Custom' : 'Automatic' }];
@@ -706,6 +793,7 @@
     }).join('');
   };
   T.enter = function () { T.area = 'nav'; T.idx = 0; T.render(); };
+  T.resume = function () { loadPrefs(); T.render(); };
   T.key = function (k) {
     var sel = T.rows.filter(function (r) { return !r.lbl; });
     if (T.area === 'nav') {

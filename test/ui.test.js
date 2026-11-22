@@ -72,5 +72,16 @@ check('anilist sorted and deduped', an.length === 2 && an[0].title === 'A Show' 
 const cm = Data.parseCinemeta({ metas: [{ id: 'tt1', type: 'series', name: 'X', poster: 'p', releaseInfo: '2022-', imdbRating: '6.8', genres: ['Action'] }, { id: 'tt2', name: 'no poster' }] });
 check('cinemeta', cm.length === 1 && cm[0].year === '2022-' && cm[0].genres[0] === 'Action');
 
+// Stremio library (continue watching)
+const lib = Data.parseLibrary([
+  { _id: 'tt1', type: 'series', name: 'Show', poster: 'p', _mtime: '2026-11-20T10:00:00Z', state: { timeOffset: 600000, duration: 2400000, video_id: 'tt1:2:4' } },
+  { _id: 'tt2', type: 'movie', name: 'Film', _mtime: '2026-11-22T10:00:00Z', state: { timeOffset: 1000, duration: 6000000, video_id: '' } },
+  { _id: 'tt3', type: 'movie', name: 'Removed', removed: true, _mtime: '2026-11-23T10:00:00Z', state: { timeOffset: 5000, duration: 1 } },
+  { _id: 'tt4', type: 'tv', name: 'Live', _mtime: '2026-11-23T10:00:00Z', state: { timeOffset: 5000 } },
+  { _id: 'tt5', type: 'movie', name: 'Unstarted', _mtime: '2026-11-23T10:00:00Z', state: { timeOffset: 0 } }]);
+check('library filter and order', lib.length === 2 && lib[0].id === 'tt2' && lib[1].id === 'tt1');
+check('library up next', lib[0].upNext === true && lib[0].position === 0);
+check('library episode', lib[1].season === 2 && lib[1].episode === 4 && lib[1].position === 600000);
+
 console.log('ui tests: ' + passed + ' passed, ' + failed + ' failed');
 if (failed) process.exit(1);
