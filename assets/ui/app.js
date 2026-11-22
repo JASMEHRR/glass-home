@@ -86,7 +86,6 @@
     var prev = top();
     if (OVERLAY[name]) { overlays = overlays.filter(function (n) { return n !== name; }); overlays.push(name); }
     else { if (base !== name && S[base].leave) S[base].leave(); overlays.forEach(function (n) { if (S[n].leave) S[n].leave(); }); base = name; overlays = []; }
-    if (prev !== name && OVERLAY[prev] && overlays.indexOf(prev) < 0 && S[prev].leave) S[prev].leave();
     paintOn();
     if (S[name].enter) S[name].enter(arg);
     resetIdle();
@@ -637,7 +636,7 @@
   // ---- For You ------------------------------------------------------------------------------
   var F = { g: 0, area: 'row', idx: 0, items: [], tx: 0, loadSeq: 0 };
   S.foryou = F;
-  F.genres = ['For You', 'Everything'].concat(Data.GENRES);
+  F.genres = ['For You', 'Featured'].concat(Data.GENRES);
   F.paintWheel = function () {
     var w = $('fyWheel'), html = w.querySelector('svg').outerHTML, n = F.genres.length;
     var spots = [[-1, 120, 118, -14], [0, 132, 248, 0], [1, 120, 388, 14]];
@@ -651,7 +650,7 @@
   F.load = function () {
     var seq = ++F.loadSeq, g = F.genres[F.g];
     $('fyMsg').textContent = 'Loading from Stremio…';
-    var p = g === 'For You' ? Data.forYou('', 'top') : g === 'Everything' ? Data.forYou('', 'imdbRating') : Data.forYou(g, 'top');
+    var p = g === 'For You' ? Data.forYou('', 'top') : g === 'Featured' ? Data.forYou('', 'imdbRating') : Data.forYou(g, 'top');
     p.then(function (items) {
       if (seq !== F.loadSeq) return;
       F.items = items; F.idx = 0; F.tx = 0;

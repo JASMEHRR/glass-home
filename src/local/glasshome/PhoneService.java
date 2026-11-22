@@ -52,6 +52,7 @@ public final class PhoneService extends Service {
     private ServerSocket server;
     private Thread thread;
     private int fails;
+    private int lockouts;
     private long lockedUntil;
 
     static void start(Context c) {
@@ -269,8 +270,10 @@ public final class PhoneService extends Service {
         if (ok) {
             fails = 0;
         } else if (++fails >= MAX_FAILS) {
+            // 1, 2, 4, ... minutes, up to 12 hours: guessing all 10,000 PINs takes weeks.
             fails = 0;
-            lockedUntil = now + 60_000;
+            lockouts = Math.min(lockouts + 1, 10);
+            lockedUntil = now + Math.min(12 * 3_600_000L, 60_000L << (lockouts - 1));
         }
         return ok;
     }

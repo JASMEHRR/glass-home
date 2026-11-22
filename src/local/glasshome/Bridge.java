@@ -338,7 +338,7 @@ final class Bridge {
     public String sleepTimer(int minutes) {
         AlarmManager alarms = (AlarmManager) a.getSystemService(Context.ALARM_SERVICE);
         PendingIntent pi = PendingIntent.getBroadcast(a, 1,
-                new Intent(BootReceiver.SLEEP_TIMER).setClass(a, BootReceiver.class), PendingIntent.FLAG_UPDATE_CURRENT);
+                new Intent(a, SleepReceiver.class), PendingIntent.FLAG_UPDATE_CURRENT);
         alarms.cancel(pi);
         if (minutes <= 0) {
             store().set("sleep.at", null);

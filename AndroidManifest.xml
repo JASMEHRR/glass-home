@@ -55,9 +55,12 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="local.glasshome.SLEEP_TIMER" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".SleepReceiver"
+            android:exported="false" />
 
         <!-- Lets the screensaver show the song playing on the TV. Off until switched on; reads no notifications. -->
         <service

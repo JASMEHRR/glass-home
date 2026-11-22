@@ -1,6 +1,6 @@
 # Build state: Glass Home (Fire TV launcher)
 
-Last updated: 2026-11-23 02:40 IST
+Last updated: 2026-11-23 02:05 IST
 
 ## Goal
 A new Fire TV home app, `local.glasshome`, built from the approved mockups:
@@ -35,16 +35,21 @@ and every dock app and Command Center button works.
 7. done, checked in the laptop browser (stage 2-9 commit): Command Center (tvOS layout, working actions: Wi-Fi info, Bluetooth, memory, speed test, Send to TV, sleep timer, Ambient, power off, apps, settings).
 8. done, checked in the laptop browser (stage 2-9 commit): For You (halo Tonight layout on Cinemeta, genre wheel, Open in Stremio).
 9. done, checked in the laptop browser (stage 2-9 commit): Home settings (scenes, screensaver delay, glass, accounts) with persistence.
-10. todo: polish, performance pass, code review, security review, report.
+10. done (stage 10 commits): polish, performance pass, code review, security review, report.
 Device stages (need the TV awake, and his OK for HOME): install, test on TV, switch HOME from dumbtv, install FanCode.
 
 ## Now
-Stage 10: polish, music listener, Stremio link, code review, security review, report.
+All laptop stages done. Installed on the TV beside dumbtv at 01:58 (HOME untouched). Nothing left that can be done without JasMehr: see Blocked.
 
 ## Blocked (needs JasMehr)
-- TV is in deep sleep (adb offline since ~00:30). Install and on-TV testing wait until it is awake. Wake it with the remote and tell Claude.
-- Switching the HOME button from dumbtv to Glass Home changes an accessibility setting: needs your OK after you try the app.
-- FanCode install: waits for the TV to be awake (official Amazon Appstore).
+- Try it on the TV: open "Glass Home" from dumbtv's app row. Not opened yet because someone was watching SmartTube at 02:00.
+- Make it the Home screen: needs your OK. Claude then swaps the accessibility service from tv.dumbtv.home/tv.dumbtv.home.Guard to local.glasshome/local.glasshome.Guard (undo: swap back).
+- Music on the screensaver: needs your OK to switch on music access: adb shell cmd notification allow_listener local.glasshome/local.glasshome.MusicListener
+- AniList: type your AniList user name on the phone page (Jarvis screen shows the address and PIN). Import your AniWatch list into AniList first.
+- Stremio Continue watching: Home settings > Accounts > Stremio > Link now, then approve on your phone (no password on the TV).
+- Ascend (deadlines from Muse, Jarvis brain for anything beyond TV control): Ascend needs two small endpoints, POST /api/tv/digest {key} -> {deadlines:[{title,due,course}]} and POST /api/tv/jarvis {key,messages} -> {reply}, plus a TV key. Not built: changes your Ascend backend, needs your go-ahead.
+- Muse: the prompt for Muse comes after Ascend's endpoints.
+- FanCode: install from the Amazon Appstore when the TV is free.
 
 ## Notes
 - Approved design decisions live in the artifact above and in DECISIONS.md.
