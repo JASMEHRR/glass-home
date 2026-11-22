@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="guard_description">Shows Glass Home when you press the Home button, and lets Glass Home put the TV to sleep.</string>
+</resources>

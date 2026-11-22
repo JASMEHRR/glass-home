@@ -1,0 +1,306 @@
+package local.glasshome;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.media.AudioManager;
+import android.os.IBinder;
+import android.os.SystemClock;
+import android.view.KeyEvent;
+
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * The phone page for Jarvis: http://TV-IP:8766, protected by a 4-digit PIN shown on the TV.
+ * Playback words (pause, play, next, previous) act at once, even over another app; everything else
+ * opens Glass Home's Jarvis screen with the words. Runs in its own process (":phone").
+ */
+public final class PhoneService extends Service {
+    static final int PORT = 8766;
+    static final String LOG_FILE = "jarvis-log.json";
+    static final String HEARD = "heard";
+    private static final String CHANNEL = "phone";
+    private static final int MAX_FAILS = 20;
+
+    private final ExecutorService pool = Executors.newFixedThreadPool(3);
+    private ServerSocket server;
+    private Thread thread;
+    private int fails;
+    private long lockedUntil;
+
+    static void start(Context c) {
+        try {
+            c.startForegroundService(new Intent(c, PhoneService.class));
+        } catch (RuntimeException ignored) {
+            // not allowed right now; the home screen starts it again on its next open
+        }
+    }
+
+    /** The PIN for the phone page, made once. */
+    static String pin(Context c) {
+        Prefs p = Prefs.get(c);
+        String pin = p.get("phone.pin", "");
+        if (!pin.matches("\\d{4}")) {
+            pin = String.format(Locale.ROOT, "%04d", new SecureRandom().nextInt(10000));
+            p.set("phone.pin", pin);
+        }
+        return pin;
+    }
+
+    /** The TV's address on the home network, or 0.0.0.0. */
+    static String lanAddress() {
+        try {
+            for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                if (!ni.isUp() || ni.isLoopback()) continue;
+                for (InetAddress ad : Collections.list(ni.getInetAddresses())) {
+                    if (ad instanceof Inet4Address && ad.isSiteLocalAddress()) return ad.getHostAddress();
+                }
+            }
+        } catch (SocketException ignored) {
+            // no network
+        }
+        return "0.0.0.0";
+    }
+
+    static boolean mediaKey(Context c, String action) {
+        int code;
+        switch (action == null ? "" : action) {
+            case "play": code = KeyEvent.KEYCODE_MEDIA_PLAY; break;
+            case "pause": code = KeyEvent.KEYCODE_MEDIA_PAUSE; break;
+            case "next": code = KeyEvent.KEYCODE_MEDIA_NEXT; break;
+            case "previous": code = KeyEvent.KEYCODE_MEDIA_PREVIOUS; break;
+            case "play_pause": code = KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE; break;
+            default: return false;
+        }
+        AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
+        long t = SystemClock.uptimeMillis();
+        am.dispatchMediaKeyEvent(new KeyEvent(t, t, KeyEvent.ACTION_DOWN, code, 0));
+        am.dispatchMediaKeyEvent(new KeyEvent(t, t, KeyEvent.ACTION_UP, code, 0));
+        return true;
+    }
+
+    /** Playback words the phone server handles itself, so they work over any app. */
+    static String mediaWord(String text) {
+        String t = text == null ? "" : text.toLowerCase(Locale.ROOT).replaceAll("[^a-z ]", " ").trim()
+                .replaceAll("\\s+", " ").replaceFirst("^(jarvis |hey jarvis |please )+", "");
+        switch (t) {
+            case "pause": case "pause it": case "pause the tv": case "pause this": case "stop": return "pause";
+            case "play": case "play it": case "resume": case "continue": case "unpause": return "play";
+            case "next": case "skip": case "next episode": case "next song": return "next";
+            case "previous": case "go back": case "previous song": return "previous";
+            default: return null;
+        }
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Jarvis phone link", NotificationManager.IMPORTANCE_MIN));
+        Notification n = new Notification.Builder(this, CHANNEL)
+                .setSmallIcon(android.R.drawable.stat_notify_sync_noanim)
+                .setContentTitle("Glass Home")
+                .setContentText("Jarvis phone link is ready")
+                .build();
+        startForeground(1, n);
+        thread = new Thread(this::serve, "phone-server");
+        thread.start();
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        return START_STICKY;
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public void onDestroy() {
+        try {
+            if (server != null) server.close();
+        } catch (IOException ignored) {
+            // closing anyway
+        }
+        pool.shutdownNow();
+        super.onDestroy();
+    }
+
+    private void serve() {
+        try {
+            server = new ServerSocket();
+            server.setReuseAddress(true);
+            server.bind(new InetSocketAddress(PORT));
+            while (!server.isClosed()) {
+                Socket s = server.accept();
+                s.setSoTimeout(8000);
+                pool.execute(() -> handle(s));
+            }
+        } catch (IOException ignored) {
+            // port busy or closed: the next start tries again
+        }
+    }
+
+    private void handle(Socket s) {
+        try (Socket sock = s; InputStream in = sock.getInputStream(); OutputStream out = sock.getOutputStream()) {
+            String head = readHead(in);
+            if (head == null) return;
+            String[] first = head.split("\r\n", 2)[0].split(" ");
+            if (first.length < 2) return;
+            String method = first[0], target = first[1];
+            int len = 0;
+            for (String line : head.split("\r\n")) {
+                if (line.toLowerCase(Locale.ROOT).startsWith("content-length:")) {
+                    try {
+                        len = Integer.parseInt(line.substring(15).trim());
+                    } catch (NumberFormatException e) {
+                        len = 0;
+                    }
+                }
+            }
+            String body = len > 0 && len <= 8192 ? new String(readN(in, len), StandardCharsets.UTF_8) : "";
+            String path = target.split("\\?", 2)[0];
+            Map<String, String> q = form(target.contains("?") ? target.split("\\?", 2)[1] : "");
+            if (!body.isEmpty()) q.putAll(form(body));
+
+            if ("GET".equals(method) && ("/".equals(path) || "/index.html".equals(path))) {
+                send(out, 200, "text/html; charset=utf-8", asset("ui/phone.html"));
+                return;
+            }
+            if (!path.startsWith("/api/")) {
+                send(out, 404, "text/plain", "not found".getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            if (!pinOk(q.get("pin"))) {
+                send(out, 403, "application/json", "{\"ok\":false,\"error\":\"pin\"}".getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            if ("/api/log".equals(path)) {
+                File f = new File(getFilesDir(), LOG_FILE);
+                byte[] data = f.exists() ? readFile(f) : "[]".getBytes(StandardCharsets.UTF_8);
+                send(out, 200, "application/json", data);
+                return;
+            }
+            if ("/api/say".equals(path) && "POST".equals(method)) {
+                String text = q.getOrDefault("text", "").trim();
+                if (text.isEmpty() || text.length() > 500) {
+                    send(out, 400, "application/json", "{\"ok\":false}".getBytes(StandardCharsets.UTF_8));
+                    return;
+                }
+                String media = mediaWord(text);
+                if (media != null) {
+                    mediaKey(this, media);
+                } else {
+                    startActivity(new Intent(this, MainActivity.class)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            .putExtra(HEARD, text));
+                }
+                send(out, 200, "application/json", new JSONObject().put("ok", true)
+                        .put("done", media == null ? "sent" : media).toString().getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            send(out, 404, "application/json", "{\"ok\":false}".getBytes(StandardCharsets.UTF_8));
+        } catch (IOException | org.json.JSONException | RuntimeException ignored) {
+            // one bad request never stops the server
+        }
+    }
+
+    private synchronized boolean pinOk(String given) {
+        long now = SystemClock.elapsedRealtime();
+        if (now < lockedUntil) return false;
+        String want = pin(this);
+        boolean ok = given != null && given.length() == want.length();
+        int diff = 0;
+        for (int i = 0; ok && i < want.length(); i++) diff |= want.charAt(i) ^ given.charAt(i);
+        ok = ok && diff == 0;
+        if (ok) {
+            fails = 0;
+        } else if (++fails >= MAX_FAILS) {
+            fails = 0;
+            lockedUntil = now + 60_000;
+        }
+        return ok;
+    }
+
+    private byte[] asset(String name) throws IOException {
+        try (InputStream in = getAssets().open(name)) {
+            return Net.readAll(in);
+        }
+    }
+
+    private static byte[] readFile(File f) throws IOException {
+        try (InputStream in = new FileInputStream(f)) {
+            return Net.readAll(in);
+        }
+    }
+
+    static Map<String, String> form(String s) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (s == null || s.isEmpty()) return out;
+        for (String part : s.split("&")) {
+            int eq = part.indexOf('=');
+            if (eq <= 0) continue;
+            try {
+                out.put(URLDecoder.decode(part.substring(0, eq), "UTF-8"), URLDecoder.decode(part.substring(eq + 1), "UTF-8"));
+            } catch (IllegalArgumentException | java.io.UnsupportedEncodingException ignored) {
+                // skip malformed pairs
+            }
+        }
+        return out;
+    }
+
+    private static String readHead(InputStream in) throws IOException {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        int c, state = 0;
+        while ((c = in.read()) != -1) {
+            b.write(c);
+            if (b.size() > 16384) return null;
+            state = (c == '\r' && (state == 0 || state == 2)) || (c == '\n' && (state == 1 || state == 3)) ? state + 1 : 0;
+            if (state == 4) return b.toString("UTF-8");
+        }
+        return null;
+    }
+
+    private static byte[] readN(InputStream in, int n) throws IOException {
+        byte[] buf = new byte[n];
+        int got = 0, r;
+        while (got < n && (r = in.read(buf, got, n - got)) > 0) got += r;
+        return buf;
+    }
+
+    private static void send(OutputStream out, int code, String type, byte[] body) throws IOException {
+        String head = "HTTP/1.1 " + code + " OK\r\nContent-Type: " + type + "\r\nContent-Length: " + body.length
+                + "\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n";
+        out.write(head.getBytes(StandardCharsets.UTF_8));
+        out.write(body);
+        out.flush();
+    }
+}
