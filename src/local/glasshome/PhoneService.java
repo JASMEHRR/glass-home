@@ -227,9 +227,34 @@ public final class PhoneService extends Service {
                         .put("done", media == null ? "sent" : media).toString().getBytes(StandardCharsets.UTF_8));
                 return;
             }
+            if ("/api/setting".equals(path) && "POST".equals(method)) {
+                String k = q.getOrDefault("key", ""), v = q.getOrDefault("value", "").trim();
+                boolean ok = settingAllowed(k, v);
+                if (ok) Prefs.get(this).set(k, v.isEmpty() ? null : v);
+                send(out, ok ? 200 : 400, "application/json", ("{\"ok\":" + ok + "}").getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            if ("/api/settings".equals(path)) {
+                Prefs p = Prefs.get(this);
+                send(out, 200, "application/json", new JSONObject().put("anilist.user", p.get("anilist.user", ""))
+                        .put("ascend.url", p.get("ascend.url", "")).put("ascend.key", p.get("ascend.key", "").isEmpty() ? "" : "set")
+                        .toString().getBytes(StandardCharsets.UTF_8));
+                return;
+            }
             send(out, 404, "application/json", "{\"ok\":false}".getBytes(StandardCharsets.UTF_8));
         } catch (IOException | org.json.JSONException | RuntimeException ignored) {
             // one bad request never stops the server
+        }
+    }
+
+    /** Only these settings can be changed from the phone page. */
+    static boolean settingAllowed(String key, String value) {
+        if (value == null || value.length() > 300 || value.indexOf('\n') >= 0) return false;
+        switch (key == null ? "" : key) {
+            case "anilist.user": return value.matches("[A-Za-z0-9_-]{0,40}");
+            case "ascend.url": return value.isEmpty() || value.matches("https://[A-Za-z0-9.-]+(:\\d+)?(/[A-Za-z0-9._~/-]*)?");
+            case "ascend.key": return value.matches("[A-Za-z0-9._~+/=-]{0,200}");
+            default: return false;
         }
     }
 

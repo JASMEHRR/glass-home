@@ -1,6 +1,6 @@
 # Build state: Glass Home (Fire TV launcher)
 
-Last updated: 2026-11-23 01:50 IST
+Last updated: 2026-11-23 02:40 IST
 
 ## Goal
 A new Fire TV home app, `local.glasshome`, built from the approved mockups:
@@ -27,19 +27,19 @@ and every dock app and Command Center button works.
 
 ## Stages
 1. done (stage 1 commit): skeleton + build pipeline (MainActivity with WebView, Bridge stub, Guard, BootReceiver, build.ps1, keystore). Ends with dist\GlassHome.apk.
-2. todo: UI shell + Home screen in the browser (router, D-pad focus engine, mock bridge, liquid-glass lens slider, glass clock behind mountain, Jarvis orb in dock).
-3. todo: native bridge (apps + icons, launch, settings intents, Wi-Fi, memory, free memory, config file).
-4. todo: data layer (native fetch + cache; Open-Meteo + IP location, Jolpica F1, AniList, Cinemeta), parsed in self-test against live responses.
-5. todo: screensaver (5 min idle, expanding buttons, expanded views, Jarvis wakes on focus).
-6. todo: Jarvis (orb, Jarvis screen, phone hold-to-talk page on port 8766, local command brain, Ascend brain hook stubbed).
-7. todo: Command Center (tvOS layout, working actions: Wi-Fi info, Bluetooth, memory, speed test, Send to TV, sleep timer, Ambient, power off, apps, settings).
-8. todo: For You (halo Tonight layout on Cinemeta, genre wheel, Open in Stremio).
-9. todo: Home settings (scenes, screensaver delay, glass, accounts) with persistence.
+2. done, checked in the laptop browser (stage 2-9 commit): UI shell + Home screen in the browser (router, D-pad focus engine, mock bridge, liquid-glass lens slider, glass clock behind mountain, Jarvis orb in dock).
+3. done, checked in the laptop browser (stage 2-9 commit): native bridge (apps + icons, launch, settings intents, Wi-Fi, memory, free memory, config file).
+4. done, checked in the laptop browser (stage 2-9 commit): data layer (native fetch + cache; Open-Meteo + IP location, Jolpica F1, AniList, Cinemeta), parsed in self-test against live responses.
+5. done, checked in the laptop browser (stage 2-9 commit): screensaver (5 min idle, expanding buttons, expanded views, Jarvis wakes on focus).
+6. done, checked in the laptop browser (stage 2-9 commit): Jarvis (orb, Jarvis screen, phone hold-to-talk page on port 8766, local command brain, Ascend brain hook stubbed).
+7. done, checked in the laptop browser (stage 2-9 commit): Command Center (tvOS layout, working actions: Wi-Fi info, Bluetooth, memory, speed test, Send to TV, sleep timer, Ambient, power off, apps, settings).
+8. done, checked in the laptop browser (stage 2-9 commit): For You (halo Tonight layout on Cinemeta, genre wheel, Open in Stremio).
+9. done, checked in the laptop browser (stage 2-9 commit): Home settings (scenes, screensaver delay, glass, accounts) with persistence.
 10. todo: polish, performance pass, code review, security review, report.
 Device stages (need the TV awake, and his OK for HOME): install, test on TV, switch HOME from dumbtv, install FanCode.
 
 ## Now
-Stage 2: writing assets/ui (index.html, style.css, app.js, mock.js) from the approved mockups.
+Stage 10: polish, music listener, Stremio link, code review, security review, report.
 
 ## Blocked (needs JasMehr)
 - TV is in deep sleep (adb offline since ~00:30). Install and on-TV testing wait until it is awake. Wake it with the remote and tell Claude.

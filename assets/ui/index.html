@@ -1,1 +1,108 @@
-<!doctype html><html><head><meta charset="utf-8"><title>Glass Home</title></head><body style="background:#000;color:#fff">Glass Home</body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glass Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Varela+Round&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage">
+
+<!-- Home -->
+<section id="home" class="screen">
+  <img class="bg bgimg" src="img/scene-night.jpg" alt="">
+  <div class="gclock rise" id="homeClock">12:00</div>
+  <img class="bg fgimg" src="img/scene-night-fg.webp" alt="">
+  <div class="shade"></div>
+  <div class="hello rise">
+    <div class="g" id="homeGreet">Good evening, JasMehr</div>
+    <div class="d"><span id="homeDate"></span><span class="dot-sep" id="homeWxSep">·</span><span id="homeWx"></span></div>
+  </div>
+  <button class="cc-btn rise" id="ccBtn" aria-label="Command Center"><svg aria-hidden="true" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="4" width="18" height="6.5" rx="3.25"/><rect x="3" y="13.5" width="18" height="6.5" rx="3.25"/><circle cx="16.8" cy="7.25" r="1.6" fill="#fff"/><circle cx="7.2" cy="16.75" r="1.6" fill="#fff"/></svg></button>
+  <div class="dockwrap rise">
+    <div class="dock" id="dock">
+      <div class="tip" id="dockTip"><span></span></div>
+      <div class="clip"><div class="track" id="dockTrack"></div></div>
+      <div class="lens" id="lens"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Screensaver -->
+<section id="ambient" class="screen">
+  <img class="bg" src="img/f1-suzuka.jpg" alt="" style="object-position:50% 40%">
+  <div class="shade"></div>
+  <div class="gclock rise" id="ambClock">12<span class="c">:</span>00</div>
+  <div class="date rise" id="ambDate"></div>
+  <div class="race rise" id="ambRace"><div class="n" id="raceName">FORMULA 1</div><div class="t" id="raceCount">--</div><div class="s" id="raceSessions"></div></div>
+  <div class="chips rise" id="chips"></div>
+  <div class="jarvis-spot rise" id="ambJarvis"><div class="orbbox"><canvas id="ambOrb"></canvas></div><div class="lbl">JARVIS</div></div>
+  <div class="hint" id="ambHint">LEFT AND RIGHT TO MOVE · OK TO OPEN</div>
+  <div class="credit" style="right:22px;top:14px">PHOTO: TAKAYUKI SUZUKI, CC BY-SA 2.0</div>
+</section>
+
+<!-- Expanded view of one screensaver button -->
+<section id="expanded" class="screen">
+  <div class="veil"></div>
+  <div class="panel glass" id="expPanel"></div>
+</section>
+
+<!-- Jarvis -->
+<section id="jarvis" class="screen">
+  <img class="bg" src="img/f1-suzuka-glass.jpg" alt="">
+  <div class="dim"></div>
+  <div class="orbbig"><canvas id="bigOrb"></canvas></div>
+  <div class="state" id="jState">LISTENING</div>
+  <div class="words" id="jWords"></div>
+  <div class="link" id="jLink"><img class="qr" id="jQr" alt=""><div>Talk to Jarvis from your phone<br><b id="jUrl"></b> · PIN <b id="jPin"></b></div></div>
+</section>
+
+<!-- Command Center -->
+<section id="command" class="screen">
+  <img class="bg" src="img/scene-night-glass.jpg" alt="">
+  <div class="dim"></div>
+  <div class="grid" id="ccGrid"></div>
+  <div class="sq" id="ccSq"></div>
+  <div class="toast" id="ccToast"></div>
+</section>
+
+<!-- For You -->
+<section id="foryou" class="screen">
+  <img class="bg" src="img/scene-night-glass.jpg" alt="">
+  <img class="art" id="fyArt" alt="">
+  <div class="glow"></div>
+  <div class="tint"></div>
+  <div class="word rise">FOR YOU<i>.</i></div>
+  <div class="tools rise"><button class="want" id="fyWant"><i></i>TONIGHT I WANT…</button></div>
+  <div class="wheel" id="fyWheel"><svg aria-hidden="true" width="140" height="560" viewBox="0 0 140 560"><path d="M10 0 A 470 470 0 0 1 10 560" fill="none" stroke="rgba(255,90,54,.7)" stroke-width="2.5"/></svg></div>
+  <div class="hero rise" id="fyHero">
+    <div class="k" id="fyKind">SERIES <span>· STREMIO</span></div>
+    <h1 id="fyTitle"></h1>
+    <div class="m" id="fyMeta"></div>
+    <button class="play" id="fyPlay"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 20 12 5 21 5 3"/></svg>Open in Stremio</button>
+  </div>
+  <img class="poster" id="fyPoster" alt="">
+  <div class="msg" id="fyMsg"></div>
+  <div class="rowclip"><div class="row" id="fyRow"></div></div>
+</section>
+
+<!-- Home settings -->
+<section id="settings" class="screen">
+  <img class="bg" src="img/scene-night-glass.jpg" alt="">
+  <div class="dim"></div>
+  <div class="nav"><h2>Home settings</h2><div class="items" id="setNav"></div></div>
+  <div class="pane" id="setPane"></div>
+  <div class="foot">Up and down to browse, OK to change, Back to close</div>
+</section>
+
+</div>
+<script src="mock.js"></script>
+<script src="orb.js"></script>
+<script src="data.js"></script>
+<script src="brain.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

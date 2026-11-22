@@ -48,6 +48,13 @@ public final class SelfTest {
         Map<String, String> f = PhoneService.form("pin=1234&text=open+stremio%21&x");
         check("form decode", "1234".equals(f.get("pin")) && "open stremio!".equals(f.get("text")) && f.size() == 2);
 
+        check("setting anilist ok", PhoneService.settingAllowed("anilist.user", "jas_mehr"));
+        check("setting anilist bad", !PhoneService.settingAllowed("anilist.user", "a b<script>"));
+        check("setting ascend https only", PhoneService.settingAllowed("ascend.url", "https://ascend.example.app")
+                && !PhoneService.settingAllowed("ascend.url", "http://evil.test") && !PhoneService.settingAllowed("ascend.url", "javascript:x"));
+        check("setting unknown key", !PhoneService.settingAllowed("phone.pin", "0000") && !PhoneService.settingAllowed("apps.hide", "x"));
+        check("qr svg", Bridge.qrSvg("http://192.168.100.156:8766/#pin=1234").startsWith("data:image/svg+xml;base64,"));
+
         if (args.length > 0 && "online".equals(args[0])) Online.run(SelfTest::check, tmp);
 
         System.out.println("self-test: " + passed + " passed, " + failed + " failed");

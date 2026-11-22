@@ -1,1 +1,157 @@
-<!doctype html><html><head><meta charset="utf-8"><title>Jarvis</title></head><body>Jarvis</body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#02040a">
+<title>Jarvis</title>
+<style>
+:root { --cyan: #67e8f9; --muted: rgba(255,255,255,.65); }
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: #02040a; color: #fff; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+body { background: radial-gradient(ellipse at 50% 0%, rgba(56,189,248,.18), transparent 55%), #02040a; padding: 18px 16px 28px; max-width: 520px; margin: 0 auto; }
+h1 { font-size: 13px; letter-spacing: .3em; font-weight: 700; color: var(--cyan); margin: 6px 0 16px; text-align: center; }
+.tabs { display: flex; gap: 6px; padding: 5px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); margin-bottom: 18px; }
+.tabs button { flex: 1; padding: 10px 0; border-radius: 999px; border: 0; background: none; color: var(--muted); font: 700 13px system-ui, sans-serif; letter-spacing: .08em; }
+.tabs button.on { background: rgba(255,255,255,.15); color: #fff; }
+.card { background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); border: 1px solid rgba(255,255,255,.14); border-radius: 22px; padding: 16px; margin-bottom: 14px; }
+textarea, input { width: 100%; font: 17px system-ui, sans-serif; color: #fff; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16); border-radius: 16px; padding: 14px; outline: none; }
+textarea { min-height: 92px; resize: none; }
+textarea:focus, input:focus { border-color: rgba(103,232,249,.6); }
+.send { margin-top: 12px; width: 100%; padding: 15px; border: 0; border-radius: 999px; background: #fff; color: #02040a; font: 700 17px system-ui, sans-serif; }
+.hint { font-size: 13px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips button { padding: 9px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.05); color: #fff; font: 14px system-ui, sans-serif; }
+.log { display: flex; flex-direction: column; gap: 8px; }
+.msg { max-width: 88%; padding: 10px 13px; border-radius: 16px; font-size: 15px; line-height: 1.45; }
+.you { align-self: flex-end; background: rgba(6,182,212,.18); border: 1px solid rgba(34,211,238,.35); }
+.jarvis { align-self: flex-start; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); }
+label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700; color: var(--muted); margin: 14px 0 6px; }
+.ok { color: var(--cyan); font-size: 14px; margin-top: 10px; min-height: 18px; }
+.hide { display: none; }
+</style>
+</head>
+<body>
+<h1>JARVIS · GLASS HOME</h1>
+
+<div id="gate" class="card hide">
+  <label for="pin">PIN SHOWN ON THE TV</label>
+  <input id="pin" inputmode="numeric" maxlength="4" autocomplete="off">
+  <button class="send" id="pinGo">Connect</button>
+  <div class="ok" id="pinMsg"></div>
+</div>
+
+<div id="app" class="hide">
+  <div class="tabs"><button class="on" data-t="talk">TALK</button><button data-t="set">ACCOUNTS</button></div>
+
+  <div id="talk">
+    <div class="card">
+      <textarea id="text" placeholder="Tap here, then the mic on your keyboard, and talk to Jarvis"></textarea>
+      <button class="send" id="sendBtn">Send to Jarvis</button>
+      <div class="hint">Your keyboard's mic turns speech into text. Pause, play, next and previous work even while a video is playing.</div>
+    </div>
+    <div class="card chips" id="quick">
+      <button>Pause</button><button>Play</button><button>Open Stremio</button><button>What's the weather</button>
+      <button>When is the next race</button><button>Next episode</button><button>Sleep in 30 minutes</button><button>Go home</button>
+    </div>
+    <div class="card log" id="log"></div>
+  </div>
+
+  <div id="set" class="hide">
+    <div class="card">
+      <label for="anilist">ANILIST USER NAME</label>
+      <input id="anilist" autocomplete="off" placeholder="For your next episodes">
+      <label for="ascendUrl">ASCEND ADDRESS</label>
+      <input id="ascendUrl" autocomplete="off" placeholder="https://...">
+      <label for="ascendKey">ASCEND TV KEY</label>
+      <input id="ascendKey" type="password" autocomplete="off" placeholder="Leave empty to keep the saved one">
+      <button class="send" id="saveBtn">Save</button>
+      <div class="ok" id="saveMsg"></div>
+      <div class="hint">These stay on the TV. The key is never shown again after saving.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var pin = '';
+  try { pin = localStorage.getItem('gh.pin') || ''; } catch (e) { pin = ''; }
+  var m = location.hash.match(/pin=(\d{4})/);
+  if (m) { pin = m[1]; try { localStorage.setItem('gh.pin', pin); } catch (e) { /* private mode */ } history.replaceState(null, '', location.pathname); }
+
+  function post(path, data) {
+    var body = Object.keys(data).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(data[k]); }).join('&');
+    return fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body + '&pin=' + encodeURIComponent(pin) })
+      .then(function (r) { if (r.status === 403) throw new Error('pin'); return r.json(); });
+  }
+  function get(path) {
+    return fetch(path + '?pin=' + encodeURIComponent(pin), { cache: 'no-store' }).then(function (r) { if (r.status === 403) throw new Error('pin'); return r.json(); });
+  }
+  function needPin(msg) { $('app').classList.add('hide'); $('gate').classList.remove('hide'); $('pinMsg').textContent = msg || ''; }
+  function ready() { $('gate').classList.add('hide'); $('app').classList.remove('hide'); poll(); loadSettings(); }
+
+  $('pinGo').onclick = function () {
+    pin = $('pin').value.trim();
+    get('/api/log').then(function () { try { localStorage.setItem('gh.pin', pin); } catch (e) { /* ok */ } ready(); })
+      .catch(function () { $('pinMsg').textContent = 'That PIN is not right. It is on the TV\'s Jarvis screen.'; });
+  };
+
+  function say(t) {
+    t = String(t || '').trim();
+    if (!t) return;
+    post('/api/say', { text: t }).then(function () { $('text').value = ''; setTimeout(poll, 800); })
+      .catch(function (e) { if (e.message === 'pin') needPin('Enter the PIN again.'); });
+  }
+  $('sendBtn').onclick = function () { say($('text').value); };
+  $('text').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); say($('text').value); } });
+  Array.prototype.forEach.call($('quick').querySelectorAll('button'), function (b) { b.onclick = function () { say(b.textContent); }; });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (b) {
+    b.onclick = function () {
+      Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (x) { x.classList.toggle('on', x === b); });
+      $('talk').classList.toggle('hide', b.getAttribute('data-t') !== 'talk');
+      $('set').classList.toggle('hide', b.getAttribute('data-t') !== 'set');
+    };
+  });
+
+  function poll() {
+    get('/api/log').then(function (list) {
+      var log = $('log');
+      log.textContent = '';
+      (list || []).slice(-12).forEach(function (l) {
+        var d = document.createElement('div');
+        d.className = 'msg ' + (l.who === 'you' ? 'you' : 'jarvis');
+        d.textContent = l.text;
+        log.appendChild(d);
+      });
+      if (!list || !list.length) { var e = document.createElement('div'); e.className = 'hint'; e.textContent = 'Nothing yet. Say something to Jarvis.'; log.appendChild(e); }
+    }).catch(function (e) { if (e.message === 'pin') needPin(); });
+  }
+  setInterval(function () { if (!$('app').classList.contains('hide')) poll(); }, 3000);
+
+  function loadSettings() {
+    get('/api/settings').then(function (s) {
+      $('anilist').value = s['anilist.user'] || '';
+      $('ascendUrl').value = s['ascend.url'] || '';
+      $('ascendKey').placeholder = s['ascend.key'] ? 'Saved. Type to replace it.' : 'Not set';
+    }).catch(function () { /* shown by poll */ });
+  }
+  $('saveBtn').onclick = function () {
+    var jobs = [post('/api/setting', { key: 'anilist.user', value: $('anilist').value.trim() }),
+      post('/api/setting', { key: 'ascend.url', value: $('ascendUrl').value.trim() })];
+    if ($('ascendKey').value) jobs.push(post('/api/setting', { key: 'ascend.key', value: $('ascendKey').value.trim() }));
+    Promise.all(jobs).then(function (r) {
+      var bad = r.filter(function (x) { return !x.ok; }).length;
+      $('saveMsg').textContent = bad ? 'Something was not saved: check the address starts with https://' : 'Saved. The TV picks it up within a minute.';
+      $('ascendKey').value = '';
+      loadSettings();
+    }).catch(function () { $('saveMsg').textContent = 'Could not reach the TV.'; });
+  };
+
+  if (pin) get('/api/log').then(ready).catch(function () { needPin(); }); else needPin();
+})();
+</script>
+</body>
+</html>

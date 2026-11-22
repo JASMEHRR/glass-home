@@ -28,6 +28,8 @@ import android.util.Base64;
 import android.view.KeyEvent;
 import android.webkit.JavascriptInterface;
 
+import io.nayuki.qrcodegen.QrCode;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -419,6 +421,28 @@ final class Bridge {
             return;
         }
         if (!tmp.renameTo(f) && f.delete() && !tmp.renameTo(f)) tmp.delete();
+    }
+
+    /** A QR code for text, as an SVG data URL (Project Nayuki's generator, MIT). */
+    @JavascriptInterface
+    public String qr(String text) {
+        return qrSvg(text);
+    }
+
+    static String qrSvg(String text) {
+        if (text == null || text.length() > 300) return "";
+        QrCode qr = QrCode.encodeText(text, QrCode.Ecc.MEDIUM);
+        int border = 2, size = qr.size + border * 2;
+        StringBuilder path = new StringBuilder();
+        for (int y = 0; y < qr.size; y++) {
+            for (int x = 0; x < qr.size; x++) {
+                if (qr.getModule(x, y)) path.append('M').append(x + border).append(',').append(y + border).append("h1v1h-1z");
+            }
+        }
+        String svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " + size + " " + size
+                + "\" shape-rendering=\"crispEdges\"><rect width=\"100%\" height=\"100%\" fill=\"#fff\"/><path d=\""
+                + path + "\" fill=\"#000\"/></svg>";
+        return "data:image/svg+xml;base64," + java.util.Base64.getEncoder().encodeToString(svg.getBytes(StandardCharsets.UTF_8));
     }
 
     /** Words the phone page sent while the page was loading, or "". */
