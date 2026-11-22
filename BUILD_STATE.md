@@ -1,6 +1,6 @@
 # Build state: Glass Home (Fire TV launcher)
 
-Last updated: 2026-11-23 02:05 IST
+Last updated: 2026-11-23 05:30 IST (session active: waiting for the TV to wake for on-TV tests)
 
 ## Goal
 A new Fire TV home app, `local.glasshome`, built from the approved mockups:
@@ -39,7 +39,7 @@ and every dock app and Command Center button works.
 Device stages (need the TV awake, and his OK for HOME): install, test on TV, switch HOME from dumbtv, install FanCode.
 
 ## Now
-All laptop stages done. Installed on the TV beside dumbtv at 01:58 (HOME untouched). Nothing left that can be done without JasMehr: see Blocked.
+On-TV test: tools/tv-test.sh is ready and runs as soon as the TV is back on the network and nothing is playing. Laptop walkthrough of every screen with remote keys passed at 05:25.
 
 ## Blocked (needs JasMehr)
 - Try it on the TV: open "Glass Home" from dumbtv's app row. Not opened yet because someone was watching SmartTube at 02:00.
