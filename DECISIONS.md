@@ -23,3 +23,5 @@
 - 2026-11-23: The Appstore tile opens the store front (ADEHomeActivity) instead of the Appstore's "Your Apps & Games" grid.
 - 2026-11-23: For You has a CONTINUE tab first (your Stremio library); it is the default once Stremio is linked.
 - 2026-11-23: Remote buttons other than the D-pad are logged (tag GlassHome) to find out whether the mic button reaches Glass Home. Undo: remove the log line in MainActivity.dispatchKeyEvent.
+- 2026-11-23 4:50 PM: At your request Glass Home is the Home screen (accessibility service swapped to local.glasshome/local.glasshome.Guard) and dumbtv is uninstalled. Backup: backup/dumbtv-1.9.apk. Undo: adb install backup/dumbtv-1.9.apk, then set enabled_accessibility_services back to tv.dumbtv.home/tv.dumbtv.home.Guard.
+- 2026-11-23: Remote mic tested: the button and audio go to Alexa only, never to apps. Voice to Jarvis via the remote needs an Alexa skill ("Alexa, ask Jarvis ...").

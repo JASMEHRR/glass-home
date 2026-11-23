@@ -1,6 +1,6 @@
 # Build state: Glass Home (Fire TV launcher)
 
-Last updated: 2026-11-23 11:45 AM IST
+Last updated: 2026-11-23 4:55 PM IST
 
 ## Goal
 A new Fire TV home app, `local.glasshome`, built from the approved mockups:
@@ -49,7 +49,8 @@ Debug the TV page from the laptop: adb forward tcp:9333 localabstract:webview_de
 ## Blocked (needs JasMehr)
 - Try it on the TV: it is open now; later, open "Glass Home" from dumbtv's app row.
 - Anime "Open in Stremio" needs the Anime Kitsu add-on in Stremio (metadata only) for Stremio to show those titles.
-- Make it the Home screen: needs your OK. Claude then swaps the accessibility service from tv.dumbtv.home/tv.dumbtv.home.Guard to local.glasshome/local.glasshome.Guard (undo: swap back).
+- Home screen: DONE 4:50 PM. Glass Home holds Home; dumbtv uninstalled (backup/dumbtv-1.9.apk).
+- Remote mic for Jarvis: only possible through an Alexa skill; needs your go-ahead and your Amazon developer sign-in.
 - Music on the screensaver: needs your OK to switch on music access: adb shell cmd notification allow_listener local.glasshome/local.glasshome.MusicListener
 - AniList: type your AniList user name on the phone page (Jarvis screen shows the address and PIN). Import your AniWatch list into AniList first.
 - Stremio Continue watching: Home settings > Accounts > Stremio > Link now, then approve on your phone (no password on the TV).

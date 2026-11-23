@@ -354,12 +354,14 @@
     x.closePath();
   }
   function drawLens() {
-    var x = Lens.x, a = Lens.a, b = Lens.b;
+    // The springs can overshoot until the edges cross; never draw narrower than a third of the drop.
+    var x = Lens.x, a = Math.min(Lens.a, Lens.b), b = Math.max(Lens.a, Lens.b), mid0 = (a + b) / 2;
+    if (b - a < LENS / 3) { a = mid0 - LENS / 6; b = mid0 + LENS / 6; }
     x.setTransform(Lens.s, 0, 0, Lens.s, 0, 0);
     x.clearRect(0, 0, Lens.w, Lens.h);
     var st = Math.max(-0.5, Math.min((b - a - LENS) / LENS, 1.5)); // >0 stretched, <0 squashed
     var h = LENS * (1 - 0.17 * st);                                // keeps its volume: longer = thinner
-    var r = Math.min(h / 2, (b - a) / 2, LENS_R + Math.max(0, st) * 46); // stretched ends round off like a drop
+    var r = Math.max(0, Math.min(h / 2, (b - a) / 2, LENS_R + Math.max(0, st) * 46)); // stretched ends round off like a drop
     var neck = Math.max(0, Math.min(h * 0.34, (st - 0.08) * h * 0.46));   // the waist between the two drops
     var top = Lens.cy - h / 2, bot = Lens.cy + h / 2;
     dropPath(x, a, b, top, bot, r, neck);
