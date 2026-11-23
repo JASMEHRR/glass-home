@@ -174,6 +174,9 @@ public final class MainActivity extends Activity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         int code = e.getKeyCode();
+        // Logs remote buttons other than the D-pad, to see which ones (the mic button?) reach us.
+        if (e.getAction() == KeyEvent.ACTION_DOWN && (code < KeyEvent.KEYCODE_DPAD_UP || code > KeyEvent.KEYCODE_DPAD_CENTER))
+            android.util.Log.i("GlassHome", "key " + KeyEvent.keyCodeToString(code) + " (" + code + ")");
         if (code == KeyEvent.KEYCODE_MENU) {
             if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) js("window.UI&&UI.key('menu')");
             return true;

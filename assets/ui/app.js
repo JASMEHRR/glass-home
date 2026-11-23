@@ -294,7 +294,7 @@
     lens.classList.add('show');
     lensTo(cx, cy, H.lensX == null);
     H.lensX = cx;
-    tip.style.left = cx + 'px';
+    tip.style.transform = 'translateX(' + cx + 'px) translateX(-50%)';
     tip.firstChild.textContent = H.items[H.idx].label || '';
     tip.style.opacity = 1;
   };
@@ -322,12 +322,16 @@
     if (!Lens.raf) { Lens.last = performance.now(); Lens.raf = requestAnimationFrame(lensFrame); }
   }
   function lensFrame(now) {
-    var dt = Math.min((now - Lens.last) / 1000, 1 / 30); Lens.last = now;
+    // Real elapsed time, stepped in fixed 1/240 s slices: a late TV frame then lands where the drop
+    // should be instead of slowing it down and catching up (that was the jitter).
+    var dt = Math.min((now - Lens.last) / 1000, 0.1); Lens.last = now;
     // two damped springs: the edge in front is stiff (quick), the one behind is soft (lags)
-    var LEAD = 420, TRAIL = 130, ZETA = 0.5;
-    var ka = Lens.dir > 0 ? TRAIL : LEAD, kb = Lens.dir > 0 ? LEAD : TRAIL;
-    Lens.va += (ka * (Lens.ta - Lens.a) - 2 * ZETA * Math.sqrt(ka) * Lens.va) * dt; Lens.a += Lens.va * dt;
-    Lens.vb += (kb * (Lens.tb - Lens.b) - 2 * ZETA * Math.sqrt(kb) * Lens.vb) * dt; Lens.b += Lens.vb * dt;
+    var LEAD = 420, TRAIL = 130, ZETA = 0.5, h = 1 / 240;
+    var ka = Lens.dir > 0 ? TRAIL : LEAD, kb = Lens.dir > 0 ? LEAD : TRAIL, ca = 2 * ZETA * Math.sqrt(ka), cb = 2 * ZETA * Math.sqrt(kb);
+    for (Lens.acc = (Lens.acc || 0) + dt; Lens.acc >= h; Lens.acc -= h) {
+      Lens.va += (ka * (Lens.ta - Lens.a) - ca * Lens.va) * h; Lens.a += Lens.va * h;
+      Lens.vb += (kb * (Lens.tb - Lens.b) - cb * Lens.vb) * h; Lens.b += Lens.vb * h;
+    }
     var still = Math.abs(Lens.ta - Lens.a) < 0.25 && Math.abs(Lens.tb - Lens.b) < 0.25 && Math.abs(Lens.va) < 3 && Math.abs(Lens.vb) < 3;
     if (still) { Lens.a = Lens.ta; Lens.b = Lens.tb; Lens.va = Lens.vb = 0; }
     drawLens();
@@ -804,9 +808,24 @@
   var F = { g: 0, area: 'row', idx: 0, items: [], tx: 0, loadSeq: 0, cat: 'anime' };
   S.foryou = F;
   // Anime / Shows / Movies along the top; the wheel on the left lists what each one offers.
-  var CATS = ['anime', 'shows', 'movies'];
-  function catGenres(c) { return c === 'anime' ? Object.keys(Data.ANIME) : ['Popular', 'Featured'].concat(Data.GENRES); }
-  F.cat = CATS.indexOf(pref('foryou.cat', 'anime')) >= 0 ? pref('foryou.cat', 'anime') : 'anime';
+  var CATS = ['continue', 'anime', 'shows', 'movies'];
+  function catGenres(c) { return c === 'continue' ? ['Watching'] : c === 'anime' ? Object.keys(Data.ANIME) : ['Popular', 'Featured'].concat(Data.GENRES); }
+  var catDefault = pref('stremio.key', '') ? 'continue' : 'anime';
+  F.cat = CATS.indexOf(pref('foryou.cat', catDefault)) >= 0 ? pref('foryou.cat', catDefault) : catDefault;
+  // Continue watching from the linked Stremio library, shaped like catalog items.
+  function continueItems() {
+    var key = pref('stremio.key', '');
+    if (!key) return Promise.reject(new Error('unlinked'));
+    return Data.watching(key).then(function (w) {
+      live.watching = w; paintChips();
+      return (w || []).map(function (x) {
+        var left = x.duration && x.position ? Math.max(1, Math.round((x.duration - x.position) / 60000)) + ' min left' : 'Up next';
+        return { id: x.id, type: x.type, name: x.name, poster: x.poster, videoId: x.videoId,
+          background: /^tt\d+$/.test(x.id) ? 'https://images.metahub.space/background/small/' + x.id + '/img' : '',
+          meta: (x.season > 0 ? 'S' + x.season + ' E' + x.episode + ' \u00b7 ' : x.episode > 0 ? 'E' + x.episode + ' \u00b7 ' : '') + left };
+      });
+    });
+  }
   F.genres = catGenres(F.cat);
   F.paintCats = function () {
     var el = $('fyCats');
@@ -827,6 +846,7 @@
     if (w.getAttribute('data-shown') !== shown) {
       w.setAttribute('data-shown', shown);
       spots.forEach(function (sp) {
+        if (n < 2 && sp[0] !== 0) return;
         var gi = (F.g + sp[0] + n) % n;
         html += '<div class="g' + (sp[0] === 0 ? ' cur' : '') + '" style="left:' + sp[1] + 'px;top:' + sp[2] + 'px;transform:rotate(' + sp[3] + 'deg)"><i></i><b>' + esc(F.genres[gi].toUpperCase()) + '</b></div>';
       });
@@ -838,16 +858,23 @@
     var seq = ++F.loadSeq, g = F.genres[F.g], type = F.cat === 'movies' ? 'movie' : 'series';
     F.loading = true;
     $('fyMsg').textContent = 'Loading from Stremio…';
-    var p = F.cat === 'anime' ? Data.anime(g)
+    var p = F.cat === 'continue' ? continueItems() : F.cat === 'anime' ? Data.anime(g)
       : Data.picks(type, g === 'Popular' || g === 'Featured' ? '' : g, g === 'Featured' ? 'imdbRating' : 'top');
     p.then(function (items) {
       if (seq !== F.loadSeq) return;
       F.loading = false;
       F.items = items; F.idx = 0; F.tx = 0;
-      $('fyMsg').textContent = items.length ? '' : 'Nothing in ' + g + ' right now.';
+      $('fyMsg').textContent = items.length ? '' : F.cat === 'continue' ? 'Nothing to continue in your Stremio library yet.' : 'Nothing in ' + g + ' right now.';
       $('fyRow').innerHTML = items.map(function (m) { return '<img src="' + esc(m.poster) + '" alt="">'; }).join('');
       F.paint();
-    }).catch(function () { if (seq === F.loadSeq) $('fyMsg').textContent = 'Could not reach Stremio\'s catalog.'; });
+    }).catch(function (e) {
+      if (seq !== F.loadSeq) return;
+      F.loading = false;
+      if (e && e.message === 'unlinked') {
+        F.items = []; F.idx = 0; $('fyRow').innerHTML = ''; F.paint();
+        $('fyMsg').textContent = 'Link Stremio to see what you were watching: Home settings > Accounts > Stremio.';
+      } else $('fyMsg').textContent = 'Could not reach Stremio\'s catalog.';
+    });
   };
   F.paint = function () {
     F.paintWheel();
@@ -864,11 +891,11 @@
     $('fyWant').classList.toggle('focus', F.area === 'want');
     $('fyPlay').classList.toggle('focus', F.area === 'play');
     if (!m) { $('fyTitle').textContent = ''; $('fyMeta').textContent = ''; $('fyPoster').style.opacity = 0; return; }
-    var kind = F.cat === 'anime' ? 'ANIME' : m.type === 'movie' ? 'FILM' : 'SERIES', fk = $('fyKind');
+    var kind = F.cat === 'continue' ? 'CONTINUE' : F.cat === 'anime' ? 'ANIME' : m.type === 'movie' ? 'FILM' : 'SERIES', fk = $('fyKind');
     if (fk.getAttribute('data-k') !== kind) { fk.setAttribute('data-k', kind); fk.innerHTML = kind + ' <span>· STREMIO</span>'; }
     setText($('fyTitle'), m.name || '');
     var g = (m.genres && m.genres[0]) || '';
-    setText($('fyMeta'), [m.year, g, m.rating ? 'IMDb ' + m.rating : ''].filter(Boolean).join(' · '));
+    setText($('fyMeta'), m.meta || [m.year, g, m.rating ? 'IMDb ' + m.rating : ''].filter(Boolean).join(' · '));
     if (m.poster && $('fyPoster').getAttribute('src') !== m.poster) $('fyPoster').src = m.poster;
     $('fyPoster').style.opacity = 1;
     paintArt(m.background);
@@ -941,7 +968,7 @@
       else if (k === 'left') { F.area = 'cats'; F.paint(); }
       else if (k === 'ok') go('jarvis');
     }
-    function open() { var m = F.items[F.idx]; if (m) GH.openStremio(m.type, m.id); }
+    function open() { var m = F.items[F.idx]; if (m) { if (m.videoId) GH.openStremioVideo(m.type, m.id, m.videoId); else GH.openStremio(m.type, m.id); } }
   };
 
   // ---- Home settings ----------------------------------------------------------------------------
@@ -993,7 +1020,7 @@
         { b: 'Weather place', s: 'Found from your internet connection unless set', val: pref('weather.lat', '') ? 'Custom' : 'Automatic' }];
     } },
     { name: 'Apps', icon: I.grid, rows: function () {
-      var hide = pref('apps.hide', 'com.amazon.bueller.music,com.amazon.minitv.android.app,com.amazon.firetv.troubleshooting,me.efesser.flauncher,com.amazon.spiderpork,tv.dumbtv.home,com.amazon.gamehub,com.android.providers.downloads.ui,com.amazon.ftv.profilepicker,com.amazon.avod,com.amazon.ftv.screensaver,com.amazon.ssm,com.amazon.vizzini.ftvcds').split(',');
+      var hide = pref('apps.hide', 'com.amazon.bueller.music,com.amazon.minitv.android.app,com.amazon.firetv.troubleshooting,me.efesser.flauncher,com.amazon.spiderpork,tv.dumbtv.home,com.amazon.gamehub,com.android.providers.downloads.ui,com.amazon.ftv.profilepicker,com.amazon.avod,com.amazon.ftv.screensaver,com.amazon.ssm,com.amazon.vizzini.ftvcds,com.amazon.cloud9,com.amazon.tahoe').split(',');
       var all = live.apps.slice();
       hide.forEach(function (h) { if (h && !all.some(function (a) { return a.id === h; })) all.push({ id: h, label: h }); });
       return [{ lbl: 'ON THE DOCK' }].concat(all.slice(0, 12).map(function (app) {

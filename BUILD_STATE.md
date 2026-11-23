@@ -1,6 +1,6 @@
 # Build state: Glass Home (Fire TV launcher)
 
-Last updated: 2026-11-23 11:15 AM IST
+Last updated: 2026-11-23 11:45 AM IST
 
 ## Goal
 A new Fire TV home app, `local.glasshome`, built from the approved mockups:
@@ -42,7 +42,7 @@ Device stages (need his OK for HOME): switch HOME from dumbtv, install FanCode.
 ## Now
 Installed on the TV and left open for JasMehr to try (Fire TV's screensaver was on top: any remote button shows it).
 Frame times on the TV (tools/tv-test.sh): home idle 8-11 ms, dock moves 7-9 ms, screensaver 6-7 ms, Command Center 7 ms.
-Since then: Nothing-style dock icons (no more squashed icons), quicker animations, For You preloads. Next: For You browsing is still about 20 ms a frame while moving along the row (fine when still); find why.
+Since then: drop jitter fixed (dock pieces on their own layers, fixed-step springs; moves 11-12 ms, worst ~30 ms), Appstore opens the store front, Silk and Amazon Kids hidden, For You CONTINUE tab. Earlier: Nothing-style dock icons (no more squashed icons), quicker animations, For You preloads. Next: For You browsing is still about 20 ms a frame while moving along the row (fine when still); find why.
 How to test on the TV: `bash tools/tv-test.sh <outdir>` (skips if something is playing, the TV is asleep, or Fire TV's screensaver is on).
 Debug the TV page from the laptop: adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>, then chrome://inspect.
 

@@ -48,6 +48,10 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 /* Every canvas (the orbs, the For You backdrop) gets its own GPU layer, so redrawing one does not
    repaint what is around it (the dock orb was too small to get a layer on its own). */
 canvas { will-change: transform; }
+/* The dock, its tiles and the app label also live on their own layers: otherwise each focus change
+   redrew that part of the page, and the TV's small image cache re-decoded the full-screen wallpaper
+   every time (up to 150 ms), which made the drop jitter. */
+.dock, .tile, .tip { will-change: transform; }
 
 /* ---------- Home ---------- */
 /* Big glass clocks. The box is only as big as the digits: a full-screen box made the TV re-run the
@@ -101,7 +105,7 @@ canvas { will-change: transform; }
 .tile.glyph { display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, rgba(44,46,54,.94), rgba(12,13,17,.96)); box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 0 0 1px rgba(255,255,255,.07); }
 .tile.glyph svg { width: 52px; height: 52px; }
 .tile.glyph svg.dots { width: 36px; height: 50px; }
-.tip { position: absolute; bottom: calc(100% + 16px); transform: translateX(-50%); white-space: nowrap; pointer-events: none; transition: left .2s var(--ease-out), opacity .15s; }
+.tip { position: absolute; bottom: calc(100% + 16px); transform: translateX(-50%); white-space: nowrap; pointer-events: none; left: 0; transition: transform .2s var(--ease-out), opacity .15s; }
 .tip span { display: block; padding: 11px 22px; border-radius: 16px; background: rgba(14,16,24,.82); border: 1px solid rgba(255,255,255,.14); font-weight: 700; font-size: 23px; }
 .credit { position: absolute; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .12em; color: rgba(255,255,255,.4); }
 

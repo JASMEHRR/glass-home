@@ -60,9 +60,11 @@ final class Bridge {
     static final String DEFAULT_HIDE = "com.amazon.bueller.music,com.amazon.minitv.android.app,"
             + "com.amazon.firetv.troubleshooting,me.efesser.flauncher,com.amazon.spiderpork,tv.dumbtv.home,"
             + "com.amazon.gamehub,com.android.providers.downloads.ui,com.amazon.ftv.profilepicker,com.amazon.avod,"
-            + "com.amazon.ftv.screensaver,com.amazon.ssm,com.amazon.vizzini.ftvcds";
+            + "com.amazon.ftv.screensaver,com.amazon.ssm,com.amazon.vizzini.ftvcds,"
+            + "com.amazon.cloud9,com.amazon.tahoe";
     static final String DEFAULT_ORDER = "local.sendtotv,org.smarttube.stable,com.stremio.one,com.amazon.firebat";
     static final String STREMIO = "com.stremio.one";
+    static final String APPSTORE = "com.amazon.venezia";
     static final String SPEED_URL = "https://speed.cloudflare.com/__down?bytes=25000000";
 
     private final MainActivity a;
@@ -201,6 +203,9 @@ final class Bridge {
         Intent i = pm.getLeanbackLaunchIntentForPackage(pkg);
         if (i == null) i = pm.getLaunchIntentForPackage(pkg);
         if (i == null) return false;
+        // The Appstore's own launch screen is just "Your Apps & Games"; its store front (search,
+        // featured, categories) is ADEHomeActivity.
+        if (APPSTORE.equals(pkg)) i = new Intent(Intent.ACTION_MAIN).setClassName(APPSTORE, APPSTORE + ".ade.ADEHomeActivity");
         if (Guard.AMAZON.equals(pkg)) Guard.pause();
         return start(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
     }

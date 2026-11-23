@@ -19,3 +19,7 @@
 - 2026-11-23: Anime in For You comes from Stremio's Anime Kitsu catalog (metadata only). Undo: drop the Anime tab in index.html and app.js.
 - 2026-11-23: Dock icons default to Nothing style (white line icons on dark glass; a dot-matrix letter for apps without one). Undo: Home settings > Appearance > App icons > Original colours. Colour icons now keep their shape instead of being squashed into squares.
 - 2026-11-23: Animations about a third quicker everywhere (you found it slow), and For You loads in the background 4 seconds after start. The dock's liquid drop is unchanged (you said it is perfect).
+- 2026-11-23: Silk Browser and Amazon Kids hidden from the dock (you asked). Undo: Home settings > Apps.
+- 2026-11-23: The Appstore tile opens the store front (ADEHomeActivity) instead of the Appstore's "Your Apps & Games" grid.
+- 2026-11-23: For You has a CONTINUE tab first (your Stremio library); it is the default once Stremio is linked.
+- 2026-11-23: Remote buttons other than the D-pad are logged (tag GlassHome) to find out whether the mic button reaches Glass Home. Undo: remove the log line in MainActivity.dispatchKeyEvent.
