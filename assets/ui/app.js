@@ -931,8 +931,7 @@
   };
   var toastT = 0;
   function toast(t) {
-    var el = top() === 'command' ? $('ccToast') : null;
-    if (!el) { console.log(t); return; }
+    var el = top() === 'command' ? $('ccToast') : $('gToast'); // every screen gets the pop-up
     el.textContent = t; el.classList.add('show');
     clearTimeout(toastT); toastT = setTimeout(function () { el.classList.remove('show'); }, 3200);
   }
@@ -1242,6 +1241,8 @@
     pause: function () { clearTimeout(idleT); clearTimeout(sleepT); [H, A, J, C].forEach(function (s) { if (s.orb) s.orb.stop(); }); },
     appsChanged: function () { H.build();  setTimeout(relayPushAll, 1500); }, // installs/uninstalls: tell the phone page
     heard: function (text) { if (top() !== 'jarvis') go('jarvis', text); else J.hear(text); },
+    // Android's installer finished (ApkInstaller): say so on whatever Glass Home screen is up.
+    installed: function (msg) { toast(String(msg || '')); if (GH.showMe) GH.showMe(); setTimeout(relayPushAll, 1500); },
     heardPending: function () { var t = GH.takeHeard(); if (t) window.UI.heard(t); },
     voice: function (ev) {
       if (top() !== 'jarvis') return;

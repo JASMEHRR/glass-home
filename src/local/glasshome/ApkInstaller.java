@@ -85,6 +85,17 @@ public final class ApkInstaller extends BroadcastReceiver {
         return out.toString();
     }
 
+    /** The new app's own name, else the file name. */
+    private static String appName(Context c, Intent i) {
+        String pkg = i.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME), file = i.getStringExtra("name");
+        try {
+            if (pkg != null) return String.valueOf(c.getPackageManager().getApplicationLabel(c.getPackageManager().getApplicationInfo(pkg, 0)));
+        } catch (PackageManager.NameNotFoundException ignored) {
+            // fall back to the file name
+        }
+        return file == null ? "the app" : file;
+    }
+
     static void note(Context c, String state, String name, String message) {
         try {
             Prefs.get(c).set(LAST, new JSONObject().put("state", state).put("name", name == null ? "" : name)
@@ -104,6 +115,8 @@ public final class ApkInstaller extends BroadcastReceiver {
             note(c, "waiting", name, "Confirm the install on the TV");
         } else if (status == PackageInstaller.STATUS_SUCCESS) {
             note(c, "done", name, "Installed");
+            MainActivity m = MainActivity.current;
+            if (m != null) m.js("window.UI&&UI.installed(" + org.json.JSONObject.quote("Installed: " + appName(c, i)) + ")");
         } else {
             String why = i.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
             note(c, "failed", name, status == PackageInstaller.STATUS_FAILURE_ABORTED ? "Cancelled on the TV"
