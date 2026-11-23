@@ -758,13 +758,37 @@
   }
   /** Anything the TV cannot do itself goes to Ascend's Jarvis (and from there to Muse). */
   function ask(text) {
+    loadPrefs(); // the phone page may have just set the Ascend address or key
     var url = pref('ascend.url', ''), k = pref('ascend.key', '');
     if (!url || !k) { reply('I can open apps, play or pause, show the weather, F1 and your episodes, and put the TV to sleep. Connect Ascend on the phone page and I can do everything else.'); return; }
-    var body = JSON.stringify({ key: k, surface: 'tv', messages: J.log.slice(-8).map(function (l) { return { role: l.who === 'you' ? 'user' : 'assistant', content: l.text }; }) });
+    var ctx = { apps: (live.apps || []).map(function (a) { return a.label; }), screen: top() };
+    var body = JSON.stringify({ key: k, surface: 'tv', context: ctx,
+      messages: J.log.slice(-8).map(function (l) { return { role: l.who === 'you' ? 'user' : 'assistant', content: l.text }; }) });
     Data.get(url.replace(/\/$/, '') + '/api/tv/jarvis', body, 0).then(function (t) {
       var res = JSON.parse(t);
+      if (res.error) { reply(/key/i.test(res.error) ? 'Ascend did not accept this TV\'s key.' : 'Ascend had a problem: ' + res.error); return; }
       reply(res.reply || res.text || 'Done.');
-    }).catch(function () { reply('I could not reach Ascend right now.'); });
+      setTimeout(function () { runTvTools(res.toolCalls || []); }, 1200);
+    }).catch(function (e) {
+      var why = String(e && e.message || e);
+      console.warn('ascend jarvis failed: ' + why); // shows in the TV log (tag GlassHome)
+      reply(/504|timeout|timed out|429/i.test(why) ? 'Ascend is slow right now. Ask me again in a moment.' : 'I could not reach Ascend right now.');
+    });
+  }
+  // Actions Ascend's Jarvis asks the TV to take (the tools declared in Ascend's tv-routes.ts).
+  function runTvTools(calls) {
+    calls.forEach(function (c) {
+      if (!c || (typeof c.confidence === 'number' && c.confidence < 0.5)) return;
+      var a = c.args || {};
+      if (c.tool === 'openApp') {
+        var want = String(a.app || '').toLowerCase(), app = (live.apps || []).filter(function (x) { return x.label.toLowerCase().indexOf(want) >= 0 || want.indexOf(x.label.toLowerCase()) >= 0; })[0];
+        if (app) GH.launch(app.id); else toast('No app called ' + a.app);
+      } else if (c.tool === 'searchStremio' && a.query) GH.searchIn('stremio', String(a.query));
+      else if (c.tool === 'searchYouTube' && a.query) GH.searchIn('youtube', String(a.query));
+      else if (c.tool === 'media' && /^(play|pause|next|previous)$/.test(a.action)) GH.media(a.action);
+      else if (c.tool === 'showScreen' && /^(home|foryou|ambient|command|settings)$/.test(a.screen)) { back(); go(a.screen); }
+      else if (c.tool === 'sleepTimer' && +a.minutes >= 0) GH.sleepTimer(+a.minutes);
+    });
   }
   window.UI = window.UI || {};
 

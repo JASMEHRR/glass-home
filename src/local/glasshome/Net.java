@@ -74,7 +74,8 @@ final class Net {
     static String fetch(String url, String body) throws IOException {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(8000);
-        c.setReadTimeout(12000);
+        // Jarvis (POST to Ascend) can think for a while; data reads stay quick.
+        c.setReadTimeout(body != null && !body.isEmpty() ? 55000 : 12000);
         c.setInstanceFollowRedirects(true);
         c.setRequestProperty("User-Agent", "GlassHome/1.0 (Fire TV home screen)");
         c.setRequestProperty("Accept", "application/json, text/xml, */*");
