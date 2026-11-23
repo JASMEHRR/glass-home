@@ -101,7 +101,7 @@ final class Bridge {
                     }
                 });
             }
-        });
+        }, "com.svox.pico"); // Fire TV's default (IVONA) has no voice installed, so it speaks silence
     }
 
     void forgetApps() {
@@ -426,17 +426,83 @@ final class Bridge {
 
     // ---- Jarvis voice and phone ------------------------------------------------------------------
 
+    /**
+     * Says text through the TV speakers: in Ascend's Jarvis voice (ElevenLabs, via Ascend's
+     * /api/tv/speak) when Ascend is connected, else in the TV's own Pico voice. Returns at once;
+     * the page hears UI.voice('start') and UI.voice('done').
+     */
     @JavascriptInterface
     public boolean speak(String text) {
-        if (!ttsReady || text == null) return false;
-        Bundle p = new Bundle();
+        if (text == null || text.trim().isEmpty()) return false;
+        final String words = text.length() > 400 ? text.substring(0, 400) : text;
+        final int gen = ++speakGen;
+        stopPlayer();
+        if (ttsReady) tts.stop();
+        String url = store().get("ascend.url", ""), key = store().get("ascend.key", "");
+        if (url.isEmpty() || key.isEmpty()) return localSpeak(words);
+        io.execute(() -> {
+            File mp3 = new File(a.getCacheDir(), "jarvis-voice.mp3");
+            boolean got = false;
+            try {
+                got = Net.download(url.replaceAll("/+$", "") + "/api/tv/speak",
+                        new JSONObject().put("key", key).put("text", words).toString(), mp3);
+            } catch (IOException | JSONException e) {
+                got = false;
+            }
+            final boolean ok = got;
+            a.ui.post(() -> {
+                if (gen != speakGen) return; // a newer reply took over
+                if (!ok || !play(mp3)) localSpeak(words);
+            });
+        });
+        return true;
+    }
+
+    private int speakGen;
+    private android.media.MediaPlayer player;
+
+    private boolean play(File mp3) {
+        try {
+            android.media.MediaPlayer p = new android.media.MediaPlayer();
+            p.setAudioAttributes(new android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_ASSISTANT)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build());
+            p.setDataSource(mp3.getPath());
+            p.setOnCompletionListener(m -> { a.js("window.UI&&UI.voice('done')"); stopPlayer(); });
+            p.setOnErrorListener((m, what, extra) -> { a.js("window.UI&&UI.voice('done')"); stopPlayer(); return true; });
+            p.prepare();
+            player = p;
+            p.start();
+            a.js("window.UI&&UI.voice('start')");
+            return true;
+        } catch (IOException | RuntimeException e) {
+            stopPlayer();
+            return false;
+        }
+    }
+
+    private void stopPlayer() {
+        android.media.MediaPlayer p = player;
+        player = null;
+        if (p != null) {
+            try {
+                p.release();
+            } catch (RuntimeException ignored) {
+                // already gone
+            }
+        }
+    }
+
+    private boolean localSpeak(String words) {
+        if (!ttsReady) return false;
         tts.setLanguage(Locale.UK);
-        return tts.speak(text.length() > 600 ? text.substring(0, 600) : text, TextToSpeech.QUEUE_FLUSH, p,
-                "j" + SystemClock.uptimeMillis()) == TextToSpeech.SUCCESS;
+        return tts.speak(words, TextToSpeech.QUEUE_FLUSH, new Bundle(), "j" + SystemClock.uptimeMillis()) == TextToSpeech.SUCCESS;
     }
 
     @JavascriptInterface
     public void stopSpeaking() {
+        speakGen++;
+        a.ui.post(this::stopPlayer);
         if (ttsReady) tts.stop();
     }
 

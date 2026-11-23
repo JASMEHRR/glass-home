@@ -71,6 +71,30 @@ final class Net {
         }
     }
 
+    /** POSTs JSON and saves the reply body to a file (the Jarvis voice mp3). True on HTTP 200. */
+    static boolean download(String url, String json, File to) throws IOException {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(25000);
+        c.setRequestMethod("POST");
+        c.setDoOutput(true);
+        c.setRequestProperty("Content-Type", "application/json");
+        c.setRequestProperty("User-Agent", "GlassHome/1.0 (Fire TV home screen)");
+        try {
+            try (OutputStream out = c.getOutputStream()) {
+                out.write(json.getBytes(StandardCharsets.UTF_8));
+            }
+            if (c.getResponseCode() != 200) return false;
+            try (java.io.InputStream in = c.getInputStream(); java.io.FileOutputStream out = new java.io.FileOutputStream(to)) {
+                byte[] buf = new byte[16384];
+                for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+            }
+            return to.length() > 0;
+        } finally {
+            c.disconnect();
+        }
+    }
+
     static String fetch(String url, String body) throws IOException {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(8000);

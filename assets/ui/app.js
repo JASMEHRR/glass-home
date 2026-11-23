@@ -718,12 +718,17 @@
     J.log = J.log.slice(-20);
     try { GH.jarvisLog(JSON.stringify(J.log)); } catch (e) { /* phone log is optional */ }
   }
-  function reply(text) {
+  // Shows the reply on the TV and says it through the TV speakers (the shorter `spoken` line when
+  // Ascend sends one). UI.voice('done') puts Jarvis back to listening after the voice ends.
+  function reply(text, spoken) {
     if (!text) { jState('listening'); return; }
     logLine('jarvis', text);
-    if (pref('voice', 'on') !== 'off' && GH.speak(text)) return;
     showWords(text);
     clearTimeout(J.timer);
+    if (pref('voice', 'on') !== 'off' && GH.speak(spoken || text)) {
+      J.timer = setTimeout(function () { jState('listening'); }, 30000); // in case the voice never reports back
+      return;
+    }
     J.timer = setTimeout(function () { jState('listening'); }, 5000);
   }
   J.hear = function (text) {
@@ -767,7 +772,7 @@
     Data.get(url.replace(/\/$/, '') + '/api/tv/jarvis', body, 0).then(function (t) {
       var res = JSON.parse(t);
       if (res.error) { reply(/key/i.test(res.error) ? 'Ascend did not accept this TV\'s key.' : 'Ascend had a problem: ' + res.error); return; }
-      reply(res.reply || res.text || 'Done.');
+      reply(res.reply || res.text || 'Done.', res.speak);
       setTimeout(function () { runTvTools(res.toolCalls || []); }, 1200);
     }).catch(function (e) {
       var why = String(e && e.message || e);

@@ -179,6 +179,17 @@ public final class Guard extends AccessibilityService {
         ((WindowManager) getSystemService(WINDOW_SERVICE)).addView(view, lp);
         cover = view;
         registerReceiver(screenOn, new IntentFilter(Intent.ACTION_SCREEN_ON));
+        // After an update or restart, Amazon's home may already be up and no new window event will
+        // come, so look once now instead of waiting for the user to move.
+        handler.postDelayed(this::checkStartupWindow, 800);
+    }
+
+    private void checkStartupWindow() {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null || root.getPackageName() == null || !AMAZON.contentEquals(root.getPackageName()) || paused) return;
+        onAmazonHome = true;
+        homeRetry.request();
+        retryHome();
     }
 
     @Override
@@ -186,6 +197,7 @@ public final class Guard extends AccessibilityService {
         cancelRetry();
         handler.removeCallbacks(uncover);
         handler.removeCallbacks(launch);
+        handler.removeCallbacksAndMessages(null);
         try {
             unregisterReceiver(screenOn);
         } catch (IllegalArgumentException ignored) {
