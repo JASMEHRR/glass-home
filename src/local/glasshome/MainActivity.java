@@ -53,7 +53,33 @@ public final class MainActivity extends Activity {
         configure(web.getSettings());
         bridge = new Bridge(this);
         web.addJavascriptInterface(bridge, "GH");
-        web.setWebViewClient(new WebViewClient());
+        // Lets the laptop inspect the page over adb (Chrome's chrome://inspect). The page's debug
+        // socket only accepts adb's shell user and this app, so it adds nothing adb cannot already do.
+        WebView.setWebContentsDebuggingEnabled(true);
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView v, String url) {
+                android.util.Log.i("GlassHome", "page loaded: " + url);
+            }
+
+            @Override
+            public void onReceivedError(WebView v, android.webkit.WebResourceRequest r, android.webkit.WebResourceError e) {
+                if (r.isForMainFrame()) android.util.Log.w("GlassHome", "page failed: " + e.getDescription());
+            }
+
+            @Override
+            public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
+                // The page's process died (usually out of memory). Start over instead of crashing.
+                android.util.Log.e("GlassHome", "page process gone, crashed=" + d.didCrash());
+                if (v == web) {
+                    ((android.view.ViewGroup) v.getParent()).removeView(v);
+                    v.destroy();
+                    web = null;
+                    recreate();
+                }
+                return true;
+            }
+        });
         web.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onConsoleMessage(ConsoleMessage m) {
@@ -121,7 +147,7 @@ public final class MainActivity extends Activity {
         // stays on here; without the Guard, Fire OS keeps its own screensaver.
         if (Guard.isRunning()) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        web.onResume();
+        if (web != null) web.onResume();
         js("window.UI&&UI.resume()");
     }
 
@@ -130,7 +156,7 @@ public final class MainActivity extends Activity {
         super.onPause();
         resumed = false;
         js("window.UI&&UI.pause()");
-        web.onPause();
+        if (web != null) web.onPause();
     }
 
     @Override

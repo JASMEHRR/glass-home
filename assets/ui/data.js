@@ -161,9 +161,15 @@
   // ---- Stremio's Cinemeta catalog ------------------------------------------------------------------
   Data.GENRES = ['Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Family',
     'Fantasy', 'History', 'Horror', 'Mystery', 'Romance', 'Sci-Fi', 'Sport', 'Thriller', 'War', 'Western'];
+  // Cinemeta's images (images.metahub.space) come in small/medium/large. Medium backdrops are
+  // 1920x1080 (about 1 MB, 100+ ms to decode on the Fire TV); small (480x270) is plenty for the
+  // blurred backdrop, and small posters (300x450) still cover the 240px poster and the thumbnails.
+  Data.smallImage = function (url) {
+    return String(url || '').replace(/^(https:\/\/images\.metahub\.space\/(?:poster|background)\/)(?:medium|large)\//, '$1small/');
+  };
   Data.parseCinemeta = function (json) {
     return ((json && json.metas) || []).filter(function (m) { return m && m.id && m.poster; }).map(function (m) {
-      return { id: m.id, type: m.type, name: m.name, poster: m.poster, background: m.background || '',
+      return { id: m.id, type: m.type, name: m.name, poster: Data.smallImage(m.poster), background: Data.smallImage(m.background),
         year: String(m.releaseInfo || m.year || '').slice(0, 9), genres: m.genres || m.genre || [], rating: m.imdbRating || '',
         description: m.description || '' };
     });
@@ -171,6 +177,16 @@
   Data.catalog = function (type, list, genre) {
     var url = 'https://v3-cinemeta.strem.io/catalog/' + type + '/' + list + (genre ? '/genre=' + encodeURIComponent(genre) : '') + '.json';
     return Data.json(url, '', 21600).then(Data.parseCinemeta);
+  };
+  /** Shows or films only (type series/movie), optionally one genre; list is top or imdbRating. */
+  Data.picks = function (type, genre, list) {
+    return Data.catalog(type, list || 'top', genre).then(function (a) { return a.slice(0, 30); });
+  };
+  /** Anime from Stremio's Anime Kitsu catalog (anime-kitsu.strem.fun: metadata only, no streams). */
+  Data.ANIME = { 'Trending': 'kitsu-anime-trending', 'Top Airing': 'kitsu-anime-airing', 'Most Popular': 'kitsu-anime-popular', 'Highest Rated': 'kitsu-anime-rating' };
+  Data.anime = function (list) {
+    var url = 'https://anime-kitsu.strem.fun/catalog/anime/' + (Data.ANIME[list] || Data.ANIME.Trending) + '.json';
+    return Data.json(url, '', 21600).then(Data.parseCinemeta).then(function (a) { return a.slice(0, 30); });
   };
   /** For You picks: popular series and films mixed, optionally in one genre. */
   Data.forYou = function (genre, list) {
@@ -209,7 +225,7 @@
         if (parts.length === 2) { s = +parts[0]; e = +parts[1]; } else if (parts.length === 1) e = +parts[0];
       }
       var upNext = st.timeOffset <= 1000;
-      return { id: o._id, type: o.type, name: o.name, poster: o.poster || '', videoId: vid, season: s, episode: e,
+      return { id: o._id, type: o.type, name: o.name, poster: Data.smallImage(o.poster), videoId: vid, season: s, episode: e,
         position: upNext ? 0 : st.timeOffset, duration: st.duration || 0, upNext: upNext };
     });
   };

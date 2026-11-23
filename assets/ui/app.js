@@ -6,13 +6,47 @@
   var stage = $('stage'), scale = 1;
 
   function fit() {
-    scale = Math.min(innerWidth / 1920, innerHeight / 1080);
+    // The screen's size in CSS pixels. Not innerWidth: on the TV (960x540 at 2x density) the
+    // 1920px stage stretches innerWidth to 1920, so the stage never shrank and was cut off.
+    var de = document.documentElement, w = de.clientWidth || innerWidth, h = de.clientHeight || innerHeight;
+    scale = Math.min(w / 1920, h / 1080);
+    window.stageScale = scale; // orb.js sizes its canvases to real screen pixels with this
     stage.style.transform = 'scale(' + scale + ')';
-    stage.style.left = Math.round((innerWidth - 1920 * scale) / 2) + 'px';
-    stage.style.top = Math.round((innerHeight - 1080 * scale) / 2) + 'px';
+    stage.style.left = Math.round((w - 1920 * scale) / 2) + 'px';
+    stage.style.top = Math.round((h - 1080 * scale) / 2) + 'px';
+    frostAll();
   }
   addEventListener('resize', fit);
   fit();
+
+  // Baked glass (see .frost in style.css): tell each glass panel where it sits on the stage, so its
+  // pre-blurred copy of the wallpaper lines up with the photo behind it.
+  function frostAll() {
+    var els = stage.querySelectorAll('.frost');
+    for (var i = 0; i < els.length; i++) {
+      var p = offsetIn(els[i], stage);
+      els[i].style.setProperty('--gx', p[0]);
+      els[i].style.setProperty('--gy', p[1]);
+    }
+  }
+  // An element's place inside an ancestor, before transforms. Adds up the whole offsetParent chain:
+  // Chrome measures from the nearest transformed ancestor too (the dock's sliding icon strip), so a
+  // single offsetLeft is not relative to the dock, which put the old lens 18px left of the icon.
+  function offsetIn(el, root) {
+    var x = 0, y = 0;
+    while (el && el !== root) { x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent; }
+    return [x, y];
+  }
+  // Keeps the glass lined up while panels slide or resize (their transitions last up to .7s).
+  var frostRaf = 0, frostEnd = 0;
+  function frostFollow(ms) {
+    frostEnd = Math.max(frostEnd, performance.now() + (ms || 900));
+    if (frostRaf) return;
+    (function step() {
+      frostAll();
+      frostRaf = performance.now() < frostEnd ? requestAnimationFrame(step) : 0;
+    })();
+  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
@@ -81,9 +115,20 @@
   var OVERLAY = { expanded: 1, jarvis: 1, command: 1, settings: 1 };
   var NAMES = ['home', 'ambient', 'foryou', 'expanded', 'jarvis', 'command', 'settings'];
   function top() { return overlays.length ? overlays[overlays.length - 1] : base; }
-  function paintOn() { NAMES.forEach(function (n) { $(n).classList.toggle('on', n === base || overlays.indexOf(n) >= 0); }); }
+  function paintOn() {
+    var t = top();
+    NAMES.forEach(function (n) {
+      var on = n === base || overlays.indexOf(n) >= 0;
+      $(n).classList.toggle('on', on);
+      // Overlays are opaque, so whatever is under one stops drawing (see .covered in style.css).
+      $(n).classList.toggle('covered', on && n !== t);
+      if (S[n] && S[n].orb && n !== t) S[n].orb.stop();
+    });
+  }
+  function setText(el, s) { if (el.textContent !== s) el.textContent = s; }
   function go(name, arg) {
     var prev = top();
+    if (name === 'expanded' && prev !== 'expanded') $('expanded').setAttribute('data-over', prev);
     if (OVERLAY[name]) { overlays = overlays.filter(function (n) { return n !== name; }); overlays.push(name); }
     else { if (base !== name && S[base].leave) S[base].leave(); overlays.forEach(function (n) { if (S[n].leave) S[n].leave(); }); base = name; overlays = []; }
     paintOn();
@@ -135,11 +180,16 @@
   function tick() {
     var now = new Date(), h24 = pref('clock', '12') === '24';
     var c = Data.clock(now, h24);
-    $('homeClock').textContent = c;
-    var parts = c.split(':');
-    $('ambClock').innerHTML = esc(parts[0]) + '<span class="c">:</span>' + esc(parts[1]);
-    $('homeGreet').textContent = Data.greeting(now) + ', ' + pref('name', 'JasMehr');
-    $('homeDate').textContent = Data.longDate(now);
+    // Only touch text that changed: each rewrite makes the TV redraw the big glass clocks.
+    setText($('homeClock'), c);
+    var amb = $('ambClock'), parts = c.split(':');
+    if (amb.getAttribute('data-t') !== c) {
+      amb.setAttribute('data-t', c);
+      amb.innerHTML = esc(parts[0]) + '<span class="c">:</span>' + esc(parts[1]);
+    }
+    if (amb.firstElementChild) amb.firstElementChild.classList.toggle('dim', now.getSeconds() % 2 === 1);
+    setText($('homeGreet'), Data.greeting(now) + ', ' + pref('name', 'JasMehr'));
+    setText($('homeDate'), Data.longDate(now));
     paintRaceCount();
     if (top() === 'ambient') { paintChipTimers(); if (now.getSeconds() % 5 === 0 && pollMusic()) paintChips(); }
     if (top() === 'expanded') S.expanded.tick();
@@ -155,7 +205,7 @@
   }
 
   // ---- Home ----------------------------------------------------------------------------------
-  var H = { idx: 1, area: 'dock', items: [], tx: 0, orb: null, lensT: 0, lensX: null };
+  var H = { idx: 1, area: 'dock', items: [], tx: 0, orb: null, lensX: null };
   S.home = H;
   function iconFor(item) {
     if (item.kind === 'foryou') return '<div class="tile builtin" style="background:linear-gradient(140deg,#0e7490,#0c1a2e)">' + ico(I.spark, 50, '#67e8f9') + '</div>';
@@ -182,6 +232,7 @@
     H.idx = Math.min(Math.max(H.idx, 0), H.items.length - 1);
     if (H.items[H.idx].kind === 'sep') H.idx = 0;
     H.lensX = null;
+    frostAll(); // the dock's width (and so its place) depends on how many apps there are
     setTimeout(H.paint, 30);
   };
   function tiles() { return Array.prototype.slice.call($('dockTrack').children); }
@@ -193,38 +244,94 @@
     var lens = $('lens'), tip = $('dockTip');
     if (H.area !== 'dock' || !t) { lens.classList.remove('show'); tip.style.opacity = 0; return; }
     // keep the focused tile inside the dock when there are many apps
-    var clipW = $('dockTrack').parentNode.clientWidth, x = t.offsetLeft - 18;
+    var clipW = $('dockTrack').parentNode.clientWidth, x = offsetIn(t, $('dockTrack'))[0];
     if (x + H.tx < 0) H.tx = -x;
     if (x + 108 + H.tx > clipW - 24) H.tx = clipW - 24 - 108 - x;
     if ($('dockTrack').scrollWidth <= clipW) H.tx = 0;
     $('dockTrack').style.transform = 'translateX(' + H.tx + 'px)';
-    var to = t.offsetLeft + H.tx - 8;
-    moveLens(H.lensX == null ? to : H.lensX, to);
-    H.lensX = to;
-    tip.style.left = (to + 62) + 'px';
+    // the focused tile's centre, in the dock's own coordinates (where the lens canvas sits)
+    var p = offsetIn(t, $('dock')), cx = p[0] + H.tx + 54, cy = p[1] + 54;
+    lens.classList.add('show');
+    lensTo(cx, cy, H.lensX == null);
+    H.lensX = cx;
+    tip.style.left = cx + 'px';
     tip.firstChild.textContent = H.items[H.idx].label || '';
     tip.style.opacity = 1;
   };
-  function moveLens(from, to) {
-    var lens = $('lens');
-    lens.classList.add('show');
-    clearTimeout(H.lensT);
-    if (from === to) {
-      lens.style.transition = 'none';
-      lens.style.left = to + 'px'; lens.style.width = '124px'; lens.style.top = '10px'; lens.style.height = '124px';
-      return;
+
+  // ---- Dock lens: a drop of liquid glass ------------------------------------------------------
+  // Drawn on a canvas over the dock. On a move its leading edge springs ahead and the trailing
+  // edge follows a beat later, so the drop stretches out of one icon, pinches in the middle like
+  // water passing from one drop to the next, then pulls into the new icon and wobbles to rest.
+  // At rest it is concentric with the focused icon (108px at scale 1.1) with a 3px glass rim.
+  var LENS = 108 * 1.1 + 6, LENS_R = 26 * 1.1 + 3;
+  var Lens = { a: 0, b: 0, va: 0, vb: 0, ta: 0, tb: 0, cy: 72, dir: 1, raf: 0, last: 0, s: 1, w: 0, h: 0, x: null };
+  function lensTo(cx, cy, snap) {
+    var cv = $('lens'), dock = $('dock');
+    var s = Math.max(1, Math.min((window.devicePixelRatio || 1) * (window.stageScale || 1), 2));
+    var w = dock.clientWidth, h = dock.clientHeight;
+    if (cv.width !== Math.round(w * s) || cv.height !== Math.round(h * s)) {
+      cv.width = Math.round(w * s); cv.height = Math.round(h * s);
+      cv.style.width = w + 'px'; cv.style.height = h + 'px';
     }
-    lens.style.transition = 'left .13s ease-in, width .13s ease-in, top .13s ease-in, height .13s ease-in';
-    lens.style.left = Math.min(from, to) + 'px';
-    lens.style.width = (Math.abs(to - from) + 124) + 'px';
-    lens.style.top = '17px'; lens.style.height = '110px';
-    H.lensT = setTimeout(function () {
-      lens.style.transition = 'left .42s var(--ease-spring), width .42s var(--ease-spring), top .42s var(--ease-spring), height .42s var(--ease-spring)';
-      lens.style.left = to + 'px'; lens.style.width = '124px'; lens.style.top = '10px'; lens.style.height = '124px';
-    }, 130);
+    Lens.x = cv.getContext('2d'); Lens.s = s; Lens.w = w; Lens.h = h; Lens.cy = cy;
+    var ta = cx - LENS / 2;
+    if (ta !== Lens.ta) Lens.dir = ta > Lens.ta ? 1 : -1;
+    Lens.ta = ta; Lens.tb = ta + LENS;
+    if (snap) { Lens.a = Lens.ta; Lens.b = Lens.tb; Lens.va = Lens.vb = 0; }
+    if (!Lens.raf) { Lens.last = performance.now(); Lens.raf = requestAnimationFrame(lensFrame); }
+  }
+  function lensFrame(now) {
+    var dt = Math.min((now - Lens.last) / 1000, 1 / 30); Lens.last = now;
+    // two damped springs: the edge in front is stiff (quick), the one behind is soft (lags)
+    var LEAD = 420, TRAIL = 130, ZETA = 0.5;
+    var ka = Lens.dir > 0 ? TRAIL : LEAD, kb = Lens.dir > 0 ? LEAD : TRAIL;
+    Lens.va += (ka * (Lens.ta - Lens.a) - 2 * ZETA * Math.sqrt(ka) * Lens.va) * dt; Lens.a += Lens.va * dt;
+    Lens.vb += (kb * (Lens.tb - Lens.b) - 2 * ZETA * Math.sqrt(kb) * Lens.vb) * dt; Lens.b += Lens.vb * dt;
+    var still = Math.abs(Lens.ta - Lens.a) < 0.25 && Math.abs(Lens.tb - Lens.b) < 0.25 && Math.abs(Lens.va) < 3 && Math.abs(Lens.vb) < 3;
+    if (still) { Lens.a = Lens.ta; Lens.b = Lens.tb; Lens.va = Lens.vb = 0; }
+    drawLens();
+    Lens.raf = still ? 0 : requestAnimationFrame(lensFrame);
+  }
+  function dropPath(x, a, b, top, bot, r, neck) {
+    var mid = (a + b) / 2, ql = Math.max(0, mid - a - r) * 0.55, qr = Math.max(0, b - r - mid) * 0.55;
+    x.beginPath();
+    x.moveTo(a + r, top);
+    x.bezierCurveTo(a + r + ql, top, mid - ql * 0.6, top + neck, mid, top + neck);
+    x.bezierCurveTo(mid + qr * 0.6, top + neck, b - r - qr, top, b - r, top);
+    x.arcTo(b, top, b, top + r, r);
+    x.lineTo(b, bot - r);
+    x.arcTo(b, bot, b - r, bot, r);
+    x.bezierCurveTo(b - r - qr, bot, mid + qr * 0.6, bot - neck, mid, bot - neck);
+    x.bezierCurveTo(mid - ql * 0.6, bot - neck, a + r + ql, bot, a + r, bot);
+    x.arcTo(a, bot, a, bot - r, r);
+    x.lineTo(a, top + r);
+    x.arcTo(a, top, a + r, top, r);
+    x.closePath();
+  }
+  function drawLens() {
+    var x = Lens.x, a = Lens.a, b = Lens.b;
+    x.setTransform(Lens.s, 0, 0, Lens.s, 0, 0);
+    x.clearRect(0, 0, Lens.w, Lens.h);
+    var st = Math.max(-0.5, Math.min((b - a - LENS) / LENS, 1.5)); // >0 stretched, <0 squashed
+    var h = LENS * (1 - 0.17 * st);                                // keeps its volume: longer = thinner
+    var r = Math.min(h / 2, (b - a) / 2, LENS_R + Math.max(0, st) * 46); // stretched ends round off like a drop
+    var neck = Math.max(0, Math.min(h * 0.34, (st - 0.08) * h * 0.46));   // the waist between the two drops
+    var top = Lens.cy - h / 2, bot = Lens.cy + h / 2;
+    dropPath(x, a, b, top, bot, r, neck);
+    var g = x.createLinearGradient(0, top, 0, bot);
+    g.addColorStop(0, 'rgba(255,255,255,.30)'); g.addColorStop(0.5, 'rgba(255,255,255,.05)'); g.addColorStop(1, 'rgba(255,255,255,.16)');
+    x.fillStyle = g; x.fill();
+    x.lineWidth = 1.6; x.strokeStyle = 'rgba(255,255,255,.85)'; x.stroke();
+    // the bright inner rim along the top edge, like light caught in a drop of water
+    var i = 2.6;
+    dropPath(x, a + i, b - i, top + i, bot - i, Math.max(0, r - i), neck);
+    var rim = x.createLinearGradient(0, top, 0, top + h * 0.55);
+    rim.addColorStop(0, 'rgba(255,255,255,.8)'); rim.addColorStop(1, 'rgba(255,255,255,0)');
+    x.lineWidth = 2; x.strokeStyle = rim; x.stroke();
   }
   H.first = function () { H.area = 'dock'; H.idx = 1; H.paint(); };
-  H.enter = function () { if (H.orb) H.orb.start(); H.paint(); };
+  H.enter = function () { if (H.orb) H.orb.start(); frostAll(); H.paint(); };
   H.resume = H.enter;
   H.leave = function () { if (H.orb) H.orb.stop(); };
   H.key = function (k) {
@@ -328,9 +435,10 @@
   function paintChips() {
     A.keys = chipKeys();
     var html = A.keys.map(function (k, i) {
-      return '<div class="chip' + (i === A.idx ? ' open' : '') + '" data-k="' + k + '"><div class="mini">' + ico(CHIP_DEFS[k].icon) + '<b>' + esc(chipMini(k)) + '</b></div><div class="body">' + chipBody(k) + '</div></div>';
+      return '<div class="chip frost' + (i === A.idx ? ' open' : '') + '" data-k="' + k + '"><div class="mini">' + ico(CHIP_DEFS[k].icon) + '<b>' + esc(chipMini(k)) + '</b></div><div class="body">' + chipBody(k) + '</div></div>';
     }).join('');
     $('chips').innerHTML = html;
+    frostAll();
     paintChipTimers();
   }
   function paintChipTimers() {
@@ -354,6 +462,7 @@
   }
   A.paint = function () {
     Array.prototype.forEach.call($('chips').children, function (el, i) { el.classList.toggle('open', i === A.idx); });
+    frostFollow(900); // pills slide while one opens; keep their glass lined up
     var onJ = A.idx === A.keys.length;
     $('ambJarvis').classList.toggle('focus', onJ);
     if (A.orb) A.orb.focus(onJ);
@@ -497,6 +606,7 @@
     if (text) J.hear(text);
   };
   J.leave = function () { if (J.orb) J.orb.stop(); GH.stopSpeaking(); };
+  J.resume = function () { if (J.orb) J.orb.start(); }; // back from an overlay opened on top (Menu)
   J.key = function () {};
   function showWords(text) {
     $('jLink').style.opacity = 0;
@@ -608,8 +718,25 @@
     all.forEach(function (el, i) { el.classList.toggle('focus', i === C.idx); });
     if (C.orb) C.orb.focus(C.idx === 8);
   };
-  C.enter = function () { C.idx = 0; status(); C.render(); };
+  C.enter = function () { C.idx = 0; status(); C.render(); ccPop(); };
+  // iOS-style opening: each tile springs out of the Command Center button (see .pop in style.css).
+  // Only on opening; tiles re-render after some actions and should not replay it then.
+  function ccPop() {
+    var cmd = $('command'), b = $('ccBtn'), bp = offsetIn(b, stage);
+    var bx = bp[0] + b.offsetWidth / 2, by = bp[1] + b.offsetHeight / 2;
+    var tiles = cmd.querySelectorAll('.pill, .sqb');
+    for (var i = 0; i < tiles.length; i++) {
+      var t = tiles[i], p = offsetIn(t, stage), dx = bx - (p[0] + t.offsetWidth / 2), dy = by - (p[1] + t.offsetHeight / 2);
+      t.style.setProperty('--dx', Math.round(dx * 0.7) + 'px');
+      t.style.setProperty('--dy', Math.round(dy * 0.7) + 'px');
+      t.style.animationDelay = (Math.sqrt(dx * dx + dy * dy) * 0.00028).toFixed(3) + 's';
+    }
+    cmd.classList.add('pop');
+    clearTimeout(C.popT);
+    C.popT = setTimeout(function () { cmd.classList.remove('pop'); }, 1300);
+  }
   C.leave = function () { if (C.orb) C.orb.stop(); };
+  C.resume = function () { if (C.orb) C.orb.start(); }; // back from Home settings
   C.key = function (k) {
     var i = C.idx;
     if (i < 8) {
@@ -634,23 +761,44 @@
   }
 
   // ---- For You ------------------------------------------------------------------------------
-  var F = { g: 0, area: 'row', idx: 0, items: [], tx: 0, loadSeq: 0 };
+  var F = { g: 0, area: 'row', idx: 0, items: [], tx: 0, loadSeq: 0, cat: 'anime' };
   S.foryou = F;
-  F.genres = ['For You', 'Featured'].concat(Data.GENRES);
+  // Anime / Shows / Movies along the top; the wheel on the left lists what each one offers.
+  var CATS = ['anime', 'shows', 'movies'];
+  function catGenres(c) { return c === 'anime' ? Object.keys(Data.ANIME) : ['Popular', 'Featured'].concat(Data.GENRES); }
+  F.cat = CATS.indexOf(pref('foryou.cat', 'anime')) >= 0 ? pref('foryou.cat', 'anime') : 'anime';
+  F.genres = catGenres(F.cat);
+  F.paintCats = function () {
+    var el = $('fyCats');
+    Array.prototype.forEach.call(el.children, function (b) { b.classList.toggle('cur', b.getAttribute('data-c') === F.cat); });
+    el.classList.toggle('focus', F.area === 'cats');
+  };
+  F.setCat = function (c) {
+    if (c === F.cat) return;
+    F.cat = c; setPref('foryou.cat', c);
+    F.genres = catGenres(c); F.g = 0;
+    F.paint(); clearTimeout(F.wt); F.wt = setTimeout(F.load, 350);
+  };
   F.paintWheel = function () {
     var w = $('fyWheel'), html = w.querySelector('svg').outerHTML, n = F.genres.length;
     var spots = [[-1, 120, 118, -14], [0, 132, 248, 0], [1, 120, 388, 14]];
-    spots.forEach(function (sp) {
-      var gi = (F.g + sp[0] + n) % n;
-      html += '<div class="g' + (sp[0] === 0 ? ' cur' : '') + '" style="left:' + sp[1] + 'px;top:' + sp[2] + 'px;transform:rotate(' + sp[3] + 'deg)"><i></i><b>' + esc(F.genres[gi].toUpperCase()) + '</b></div>';
-    });
-    w.innerHTML = html;
+    var shown = spots.map(function (sp) { return F.genres[(F.g + sp[0] + n) % n]; }).join('|');
+    // Rebuild only when the genres shown change; moving along the row repainted it every time.
+    if (w.getAttribute('data-shown') !== shown) {
+      w.setAttribute('data-shown', shown);
+      spots.forEach(function (sp) {
+        var gi = (F.g + sp[0] + n) % n;
+        html += '<div class="g' + (sp[0] === 0 ? ' cur' : '') + '" style="left:' + sp[1] + 'px;top:' + sp[2] + 'px;transform:rotate(' + sp[3] + 'deg)"><i></i><b>' + esc(F.genres[gi].toUpperCase()) + '</b></div>';
+      });
+      w.innerHTML = html;
+    }
     w.classList.toggle('focus', F.area === 'wheel');
   };
   F.load = function () {
-    var seq = ++F.loadSeq, g = F.genres[F.g];
+    var seq = ++F.loadSeq, g = F.genres[F.g], type = F.cat === 'movies' ? 'movie' : 'series';
     $('fyMsg').textContent = 'Loading from Stremio…';
-    var p = g === 'For You' ? Data.forYou('', 'top') : g === 'Featured' ? Data.forYou('', 'imdbRating') : Data.forYou(g, 'top');
+    var p = F.cat === 'anime' ? Data.anime(g)
+      : Data.picks(type, g === 'Popular' || g === 'Featured' ? '' : g, g === 'Featured' ? 'imdbRating' : 'top');
     p.then(function (items) {
       if (seq !== F.loadSeq) return;
       F.items = items; F.idx = 0; F.tx = 0;
@@ -661,6 +809,7 @@
   };
   F.paint = function () {
     F.paintWheel();
+    F.paintCats();
     var m = F.items[F.idx];
     var imgs = $('fyRow').children;
     Array.prototype.forEach.call(imgs, function (el, i) { el.classList.toggle('focus', F.area === 'row' && i === F.idx); el.classList.toggle('sel', F.area !== 'row' && i === F.idx); });
@@ -673,14 +822,47 @@
     $('fyWant').classList.toggle('focus', F.area === 'want');
     $('fyPlay').classList.toggle('focus', F.area === 'play');
     if (!m) { $('fyTitle').textContent = ''; $('fyMeta').textContent = ''; $('fyPoster').style.opacity = 0; return; }
-    $('fyKind').innerHTML = (m.type === 'movie' ? 'FILM' : 'SERIES') + ' <span>· STREMIO</span>';
-    $('fyTitle').textContent = m.name;
+    var kind = F.cat === 'anime' ? 'ANIME' : m.type === 'movie' ? 'FILM' : 'SERIES', fk = $('fyKind');
+    if (fk.getAttribute('data-k') !== kind) { fk.setAttribute('data-k', kind); fk.innerHTML = kind + ' <span>· STREMIO</span>'; }
+    setText($('fyTitle'), m.name || '');
     var g = (m.genres && m.genres[0]) || '';
-    $('fyMeta').textContent = [m.year, g, m.rating ? 'IMDb ' + m.rating : ''].filter(Boolean).join(' · ');
-    $('fyPoster').src = m.poster; $('fyPoster').style.opacity = 1;
-    var art = $('fyArt');
-    if (m.background) { art.src = m.background; art.classList.add('show'); } else art.classList.remove('show');
+    setText($('fyMeta'), [m.year, g, m.rating ? 'IMDb ' + m.rating : ''].filter(Boolean).join(' · '));
+    if (m.poster && $('fyPoster').getAttribute('src') !== m.poster) $('fyPoster').src = m.poster;
+    $('fyPoster').style.opacity = 1;
+    paintArt(m.background);
   };
+  // The blurred backdrop: drawn at 192x108 with the blur baked in, then stretched to full screen by
+  // CSS. Looks like filter: blur(30px) on the full-size image at a tiny fraction of the GPU work.
+  function paintArt(url) {
+    var c = $('fyArt');
+    if ((url || '') === F.artUrl) return;
+    F.artUrl = url || '';
+    clearTimeout(F.artT);
+    if (!url) { c.classList.remove('show'); return; }
+    // Wait until the selection rests (holding Right skips the titles in between). The picture is
+    // fetched and decoded (and shrunk) off the main thread: decoding it inside drawImage stalled the
+    // row on the TV. Falls back to a plain image where the fetch is not allowed (laptop preview).
+    F.artT = setTimeout(function () {
+      function draw(src, iw, ih) {
+        if (F.artUrl !== url) return; // the user has already moved on to another title
+        var x = c.getContext('2d'), w = c.width, h = c.height, pad = 4; // pad keeps the soft edges solid
+        var s = Math.max((w + pad * 2) / iw, (h + pad * 2) / ih), dw = iw * s, dh = ih * s;
+        x.filter = 'blur(1px) saturate(115%)';
+        x.clearRect(0, 0, w, h);
+        x.drawImage(src, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        c.classList.add('show');
+      }
+      function viaImage() {
+        var im = new Image();
+        im.src = url;
+        im.decode().then(function () { draw(im, im.naturalWidth, im.naturalHeight); },
+          function () { if (F.artUrl === url) c.classList.remove('show'); });
+      }
+      fetch(url).then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.blob(); })
+        .then(function (b) { return createImageBitmap(b, { resizeWidth: c.width + 16, resizeQuality: 'medium' }); })
+        .then(function (bm) { draw(bm, bm.width, bm.height); }, viaImage);
+    }, 250);
+  }
   F.enter = function () { F.area = 'row'; if (!F.items.length) F.load(); F.paint(); };
   F.key = function (k) {
     var n = F.items.length, ga = F.genres.length;
@@ -696,15 +878,23 @@
       else if (k === 'ok') { open(); return; }
       F.paint(); return;
     }
+    if (F.area === 'cats') {
+      var ci = CATS.indexOf(F.cat);
+      if (k === 'left' && ci > 0) F.setCat(CATS[ci - 1]);
+      else if (k === 'right') { if (ci < CATS.length - 1) F.setCat(CATS[ci + 1]); else { F.area = 'want'; F.paint(); } }
+      else if (k === 'down' || k === 'ok') { F.area = 'play'; F.paint(); }
+      return;
+    }
     if (F.area === 'play') {
       if (k === 'down') F.area = 'row';
-      else if (k === 'up') F.area = 'want';
+      else if (k === 'up') F.area = 'cats';
       else if (k === 'left') F.area = 'wheel';
       else if (k === 'ok') { open(); return; }
       F.paint(); return;
     }
     if (F.area === 'want') {
       if (k === 'down') { F.area = 'play'; F.paint(); }
+      else if (k === 'left') { F.area = 'cats'; F.paint(); }
       else if (k === 'ok') go('jarvis');
     }
     function open() { var m = F.items[F.idx]; if (m) GH.openStremio(m.type, m.id); }
@@ -757,7 +947,7 @@
         { b: 'Weather place', s: 'Found from your internet connection unless set', val: pref('weather.lat', '') ? 'Custom' : 'Automatic' }];
     } },
     { name: 'Apps', icon: I.grid, rows: function () {
-      var hide = pref('apps.hide', 'com.amazon.bueller.music,com.amazon.minitv.android.app,com.amazon.firetv.troubleshooting,me.efesser.flauncher,com.amazon.spiderpork,tv.dumbtv.home').split(',');
+      var hide = pref('apps.hide', 'com.amazon.bueller.music,com.amazon.minitv.android.app,com.amazon.firetv.troubleshooting,me.efesser.flauncher,com.amazon.spiderpork,tv.dumbtv.home,com.amazon.gamehub,com.android.providers.downloads.ui,com.amazon.ftv.profilepicker,com.amazon.avod,com.amazon.ftv.screensaver,com.amazon.ssm,com.amazon.vizzini.ftvcds').split(',');
       var all = live.apps.slice();
       hide.forEach(function (h) { if (h && !all.some(function (a) { return a.id === h; })) all.push({ id: h, label: h }); });
       return [{ lbl: 'ON THE DOCK' }].concat(all.slice(0, 12).map(function (app) {

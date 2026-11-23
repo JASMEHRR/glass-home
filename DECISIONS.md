@@ -9,3 +9,11 @@
 - 2026-11-23: Settings file moved to the app's private storage (it holds the Stremio and Ascend keys). Edit it through Home settings or the phone page, not adb.
 - 2026-11-23: "Everything" on the For You wheel renamed "Featured" (it is Stremio's Featured list).
 - 2026-11-23: Installed on the TV next to dumbtv at 01:58. HOME not switched. App not opened because SmartTube was playing.
+- 2026-11-23: Page debugging over adb is switched on (WebView.setWebContentsDebuggingEnabled). Its socket only accepts adb's shell user and the app itself. Undo: remove the line in MainActivity.
+- 2026-11-23: Glass panels use "baked glass" (a pre-blurred copy of the still wallpaper, tools/make-frost.py) instead of a live blur; the live blur made every frame on the TV take 30-50 ms. Undo: put backdrop-filter back in style.css.
+- 2026-11-23: The wallpaper no longer drifts (you asked for no animated wallpaper; it also cost a redraw every frame).
+- 2026-11-23: Orbs animate at 30 fps: a steady 30 is smoother on this TV than an uneven 45-60.
+- 2026-11-23: Fire OS system tiles hidden from the dock by default (Game Center, Downloads, Profile UI, FireTV Player, Screensaver, System Status Monitor, What Should I Watch). Undo: Home settings > Apps.
+- 2026-11-23: Everything sits at least 96px from the screen edges because TVs crop the edges.
+- 2026-11-23: For You shows small Cinemeta images (480x270 backdrops, 300x450 posters); medium backdrops are 1 MB and took 100+ ms to decode on the TV.
+- 2026-11-23: Anime in For You comes from Stremio's Anime Kitsu catalog (metadata only). Undo: drop the Anime tab in index.html and app.js.

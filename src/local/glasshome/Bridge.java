@@ -58,7 +58,9 @@ import java.util.concurrent.Executors;
  */
 final class Bridge {
     static final String DEFAULT_HIDE = "com.amazon.bueller.music,com.amazon.minitv.android.app,"
-            + "com.amazon.firetv.troubleshooting,me.efesser.flauncher,com.amazon.spiderpork,tv.dumbtv.home";
+            + "com.amazon.firetv.troubleshooting,me.efesser.flauncher,com.amazon.spiderpork,tv.dumbtv.home,"
+            + "com.amazon.gamehub,com.android.providers.downloads.ui,com.amazon.ftv.profilepicker,com.amazon.avod,"
+            + "com.amazon.ftv.screensaver,com.amazon.ssm,com.amazon.vizzini.ftvcds";
     static final String DEFAULT_ORDER = "local.sendtotv,org.smarttube.stable,com.stremio.one,com.amazon.firebat";
     static final String STREMIO = "com.stremio.one";
     static final String SPEED_URL = "https://speed.cloudflare.com/__down?bytes=25000000";

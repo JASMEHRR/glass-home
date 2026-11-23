@@ -1,6 +1,6 @@
 # Build state: Glass Home (Fire TV launcher)
 
-Last updated: 2026-11-23 05:30 IST (session active: waiting for the TV to wake for on-TV tests)
+Last updated: 2026-11-23 11:05 AM IST
 
 ## Goal
 A new Fire TV home app, `local.glasshome`, built from the approved mockups:
@@ -36,13 +36,19 @@ and every dock app and Command Center button works.
 8. done, checked in the laptop browser (stage 2-9 commit): For You (halo Tonight layout on Cinemeta, genre wheel, Open in Stremio).
 9. done, checked in the laptop browser (stage 2-9 commit): Home settings (scenes, screensaver delay, glass, accounts) with persistence.
 10. done (stage 10 commits): polish, performance pass, code review, security review, report.
-Device stages (need the TV awake, and his OK for HOME): install, test on TV, switch HOME from dumbtv, install FanCode.
+11. done, tested on the TV: on-TV fixes. Page files were packed as assets/ui\index.html (black "Webpage not available" screen); page now fits the 2x-density screen; speed pass (baked glass instead of live blur, 30 fps orbs, no endless animations, small Cinemeta images); liquid-glass drop on the dock (was 18px off the icon); iOS-style Command Center pop; everything kept 96px inside the TV's cropped edges; For You gets Anime / Shows / Movies and a visible backdrop.
+Device stages (need his OK for HOME): switch HOME from dumbtv, install FanCode.
 
 ## Now
-On-TV test: tools/tv-test.sh is ready and runs as soon as the TV is back on the network and nothing is playing. Laptop walkthrough of every screen with remote keys passed at 05:25.
+Installed on the TV and left open for JasMehr to try (Fire TV's screensaver was on top: any remote button shows it).
+Frame times on the TV (tools/tv-test.sh): home idle 8-11 ms, dock moves 7-9 ms, screensaver 6-7 ms, Command Center 7 ms.
+Next: For You browsing is still about 20 ms a frame while moving along the row (fine when still); find why.
+How to test on the TV: `bash tools/tv-test.sh <outdir>` (skips if something is playing, the TV is asleep, or Fire TV's screensaver is on).
+Debug the TV page from the laptop: adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>, then chrome://inspect.
 
 ## Blocked (needs JasMehr)
-- Try it on the TV: open "Glass Home" from dumbtv's app row. Not opened yet because someone was watching SmartTube at 02:00.
+- Try it on the TV: it is open now; later, open "Glass Home" from dumbtv's app row.
+- Anime "Open in Stremio" needs the Anime Kitsu add-on in Stremio (metadata only) for Stremio to show those titles.
 - Make it the Home screen: needs your OK. Claude then swaps the accessibility service from tv.dumbtv.home/tv.dumbtv.home.Guard to local.glasshome/local.glasshome.Guard (undo: swap back).
 - Music on the screensaver: needs your OK to switch on music access: adb shell cmd notification allow_listener local.glasshome/local.glasshome.MusicListener
 - AniList: type your AniList user name on the phone page (Jarvis screen shows the address and PIN). Import your AniWatch list into AniList first.

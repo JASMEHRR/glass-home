@@ -72,9 +72,9 @@ $ResZip = Join-Path $Build 'res.zip'
 $BaseApk = Join-Path $Build 'base.apk'
 Run (Join-Path $Bt 'aapt2.exe') @('compile', '--dir', (Join-Path $Root 'res'), '-o', $ResZip)
 Run (Join-Path $Bt 'aapt2.exe') @('link', '-o', $BaseApk, '-I', $AndroidJar,
-    '--manifest', (Join-Path $Root 'AndroidManifest.xml'), '-A', (Join-Path $Root 'assets'),
+    '--manifest', (Join-Path $Root 'AndroidManifest.xml'),
     '--java', (Join-Path $Build 'gen'), '--min-sdk-version', '28', '--target-sdk-version', '28',
-    '--version-code', "$VersionCode", '--version-name', $VersionName, '-0', 'jpg', '-0', 'webp', $ResZip)
+    '--version-code', "$VersionCode", '--version-name', $VersionName, $ResZip)
 
 Step 'compile (javac)'
 $Sources = $AllSources + @(Get-ChildItem -Path (Join-Path $Build 'gen') -Recurse -Filter '*.java' -ErrorAction Stop | ForEach-Object FullName)
@@ -93,6 +93,16 @@ Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $zip = [System.IO.Compression.ZipFile]::Open($Unsigned, [System.IO.Compression.ZipArchiveMode]::Update)
 try {
     [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $Build 'dex\classes.dex'), 'classes.dex') | Out-Null
+    # Assets go in here, not through aapt2 -A: on Windows aapt2 names them like assets/ui\index.html,
+    # which Android cannot open, so the TV showed a black "Webpage not available" screen.
+    $AssetRoot = (Get-Item -LiteralPath (Join-Path $Root 'assets') -ErrorAction Stop).FullName.TrimEnd('\')
+    $Packed = '.jpg', '.jpeg', '.png', '.webp', '.gif', '.woff2', '.mp3', '.mp4'
+    foreach ($f in Get-ChildItem -LiteralPath $AssetRoot -Recurse -File -ErrorAction Stop) {
+        $rel = $f.FullName.Substring($AssetRoot.Length + 1).Replace('\', '/')
+        $level = [System.IO.Compression.CompressionLevel]::Optimal
+        if ($Packed -contains $f.Extension.ToLowerInvariant()) { $level = [System.IO.Compression.CompressionLevel]::NoCompression }
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $f.FullName, "assets/$rel", $level) | Out-Null
+    }
 } finally {
     $zip.Dispose()
 }
@@ -115,6 +125,11 @@ if (-not (Test-Path -LiteralPath $KeyStore)) {
 $Apk = Join-Path $Dist 'GlassHome.apk'
 Run (Join-Path $Bt 'apksigner.bat') @('sign', '--ks', $KeyStore, '--ks-pass', "file:$KeyPass", '--out', $Apk, $Aligned)
 Run (Join-Path $Bt 'apksigner.bat') @('verify', $Apk)
+$check = [System.IO.Compression.ZipFile]::OpenRead($Apk)
+try { $names = @($check.Entries | ForEach-Object { $_.FullName }) } finally { $check.Dispose() }
+$bad = @($names | Where-Object { $_.Contains('\') })
+if ($bad.Count -gt 0) { throw "APK entry names with backslashes (Android cannot open these): $($bad -join ', ')" }
+if ($names -notcontains 'assets/ui/index.html') { throw 'APK is missing assets/ui/index.html' }
 Write-Host ("Built {0} ({1:N0} KB)" -f $Apk, ((Get-Item -LiteralPath $Apk).Length / 1KB)) -ForegroundColor Green
 
 if ($Install) {

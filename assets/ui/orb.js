@@ -51,7 +51,9 @@
     this.cur = { sp: s.sp, act: s.act, r: s.r, g: s.g, b: s.b, lk: s.lk, gl: s.gl };
     this.ang = Math.random() * 6.28;
     this.px = new Float32Array(this.n); this.py = new Float32Array(this.n); this.pz = new Float32Array(this.n);
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Real screen pixels per stage pixel: the TV is 2x density but the stage is scaled to 0.5, so
+    // this is 1 there. Using devicePixelRatio alone drew every orb at 4x the pixels it needs.
+    var dpr = Math.max(1, Math.min((window.devicePixelRatio || 1) * (window.stageScale || 1), 2));
     canvas.width = size * dpr; canvas.height = size * dpr;
     this.x = canvas.getContext('2d');
     this.x.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -66,6 +68,9 @@
   Orb.prototype.stop = function () { if (this.raf) cancelAnimationFrame(this.raf); this.raf = 0; };
 
   Orb.prototype.frame = function (now) {
+    // 30 fps: on the Fire TV every changed frame costs 12-20 ms in the WebView pipeline, so 60 fps
+    // could never be steady. Every other vsync is steady, smooth for a slow orb, and half the work.
+    if (now - this.last < 1000 / 30 - 3) { this.raf = requestAnimationFrame(this.frame); return; }
     var dt = Math.min((now - this.last) / 1000, 0.05); this.last = now;
     var t = now / 1000, cur = this.cur;
     var tg = STATES[this.focused && this.state === 'idle' ? 'focus' : this.state];
