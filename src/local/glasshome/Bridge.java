@@ -170,17 +170,8 @@ final class Bridge {
             Bitmap b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
             Canvas c = new Canvas(b);
             boolean useIcon = icon != null && (banner == null || icon.getIntrinsicWidth() >= 96);
-            if (useIcon) {
-                icon.setBounds(0, 0, size, size);
-                icon.draw(c);
-            } else if (banner != null) {
-                int bw = banner.getIntrinsicWidth() > 0 ? banner.getIntrinsicWidth() : 320;
-                int bh = banner.getIntrinsicHeight() > 0 ? banner.getIntrinsicHeight() : 180;
-                int w = Math.round(bw * (size / (float) bh));
-                int left = (size - w) / 2;
-                banner.setBounds(left, 0, left + w, size);
-                banner.draw(c);
-            }
+            if (useIcon) drawFit(icon, c, size);
+            else if (banner != null) drawFit(banner, c, size);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             b.compress(Bitmap.CompressFormat.PNG, 100, out);
             data = "data:image/png;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
@@ -189,6 +180,19 @@ final class Bridge {
         }
         icons.put(pkg, data);
         return data;
+    }
+
+    /** Draws d inside a size x size square keeping its shape: many Fire TV icons are wide logos. */
+    private static void drawFit(Drawable d, Canvas c, int size) {
+        int w = d.getIntrinsicWidth(), h = d.getIntrinsicHeight();
+        if (w <= 0 || h <= 0) {
+            d.setBounds(0, 0, size, size);
+        } else {
+            float s = Math.min(size / (float) w, size / (float) h);
+            int dw = Math.round(w * s), dh = Math.round(h * s), l = (size - dw) / 2, t = (size - dh) / 2;
+            d.setBounds(l, t, l + dw, t + dh);
+        }
+        d.draw(c);
     }
 
     @JavascriptInterface

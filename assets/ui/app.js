@@ -207,7 +207,47 @@
   // ---- Home ----------------------------------------------------------------------------------
   var H = { idx: 1, area: 'dock', items: [], tx: 0, orb: null, lensX: null };
   S.home = H;
+  // ---- Nothing-style app icons ------------------------------------------------------------------
+  // White line glyphs for known apps; any other app gets its first letter as a 5x7 dot matrix.
+  var GLYPHS = {
+    'local.sendtotv': '<path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/><path d="M2 12a9 9 0 0 1 8 8"/><path d="M2 16a5 5 0 0 1 4 4"/><path d="M2 20h.01"/>',
+    'org.smarttube.stable': '<path d="M2.5 17a24 24 0 0 1 0-10 2 2 0 0 1 1.4-1.4 50 50 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24 24 0 0 1 0 10 2 2 0 0 1-1.4 1.4 50 50 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/>',
+    'com.stremio.one': '<path d="M12 2.5 21.5 12 12 21.5 2.5 12z"/><path d="m10.2 9.2 4.6 2.8-4.6 2.8z"/>',
+    'com.amazon.firebat': '<path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+    'com.amazon.tahoe': '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>',
+    'com.amazon.venezia': '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+    'dnsfilter.android': '<path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+    'com.amazon.cloud9': '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+    'com.amazon.firetv.youtube': '<path d="M2.5 17a24 24 0 0 1 0-10 2 2 0 0 1 1.4-1.4 50 50 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24 24 0 0 1 0 10 2 2 0 0 1-1.4 1.4 50 50 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/>',
+    'com.google.android.youtube.tv': '<path d="M2.5 17a24 24 0 0 1 0-10 2 2 0 0 1 1.4-1.4 50 50 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24 24 0 0 1 0 10 2 2 0 0 1-1.4 1.4 50 50 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/>',
+    'com.spotify.tv.android': '<path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/>'
+  };
+  var DOTS = {
+    A: [14, 17, 17, 31, 17, 17, 17], B: [30, 17, 17, 30, 17, 17, 30], C: [14, 17, 16, 16, 16, 17, 14], D: [30, 17, 17, 17, 17, 17, 30],
+    E: [31, 16, 16, 30, 16, 16, 31], F: [31, 16, 16, 30, 16, 16, 16], G: [14, 17, 16, 23, 17, 17, 15], H: [17, 17, 17, 31, 17, 17, 17],
+    I: [14, 4, 4, 4, 4, 4, 14], J: [7, 2, 2, 2, 2, 18, 12], K: [17, 18, 20, 24, 20, 18, 17], L: [16, 16, 16, 16, 16, 16, 31],
+    M: [17, 27, 21, 21, 17, 17, 17], N: [17, 17, 25, 21, 19, 17, 17], O: [14, 17, 17, 17, 17, 17, 14], P: [30, 17, 17, 30, 16, 16, 16],
+    Q: [14, 17, 17, 17, 21, 18, 13], R: [30, 17, 17, 30, 20, 18, 17], S: [15, 16, 16, 14, 1, 1, 30], T: [31, 4, 4, 4, 4, 4, 4],
+    U: [17, 17, 17, 17, 17, 17, 14], V: [17, 17, 17, 17, 17, 10, 4], W: [17, 17, 17, 21, 21, 21, 10], X: [17, 17, 10, 4, 10, 17, 17],
+    Y: [17, 17, 17, 10, 4, 4, 4], Z: [31, 1, 2, 4, 8, 16, 31], 0: [14, 17, 19, 21, 25, 17, 14], 1: [4, 12, 4, 4, 4, 4, 14],
+    2: [14, 17, 1, 2, 4, 8, 31], 3: [31, 2, 4, 2, 1, 17, 14], 4: [2, 6, 10, 18, 31, 2, 2], 5: [31, 16, 30, 1, 1, 17, 14],
+    6: [6, 8, 16, 30, 17, 17, 14], 7: [31, 1, 2, 4, 8, 8, 8], 8: [14, 17, 17, 14, 17, 17, 14], 9: [14, 17, 17, 15, 1, 2, 12]
+  };
+  function glyph(path) {
+    return '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + path + '</svg>';
+  }
+  function dotLetter(label) {
+    var m = String(label || '').toUpperCase().match(/[A-Z0-9]/), rows = DOTS[m ? m[0] : ''];
+    if (!rows) return glyph('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>');
+    var out = '';
+    for (var r = 0; r < 7; r++) for (var c = 0; c < 5; c++) if (rows[r] & (16 >> c)) out += '<circle cx="' + (2 + c * 4) + '" cy="' + (2 + r * 4) + '" r="1.5"/>';
+    return '<svg class="dots" aria-hidden="true" viewBox="0 0 20 28" fill="#fff">' + out + '</svg>';
+  }
+  function nothingIcons() { return pref('icons', 'nothing') !== 'colour'; }
   function iconFor(item) {
+    if (nothingIcons() && item.kind === 'app') return '<div class="tile glyph">' + (GLYPHS[item.id] ? glyph(GLYPHS[item.id]) : dotLetter(item.label)) + '</div>';
+    if (nothingIcons() && item.kind === 'foryou') return '<div class="tile glyph">' + glyph(I.spark) + '</div>';
+    if (nothingIcons() && item.kind === 'fire') return '<div class="tile glyph">' + glyph(I.gear) + '</div>';
     if (item.kind === 'foryou') return '<div class="tile builtin" style="background:linear-gradient(140deg,#0e7490,#0c1a2e)">' + ico(I.spark, 50, '#67e8f9') + '</div>';
     if (item.kind === 'fire') return '<div class="tile builtin" style="background:linear-gradient(160deg,rgba(90,94,104,.9),rgba(44,46,54,.92))">' + ico(I.gear, 50) + '</div>';
     if (item.kind === 'jarvis') return '<div class="tile orbtile"><canvas id="dockOrb"></canvas></div>';
@@ -729,11 +769,11 @@
       var t = tiles[i], p = offsetIn(t, stage), dx = bx - (p[0] + t.offsetWidth / 2), dy = by - (p[1] + t.offsetHeight / 2);
       t.style.setProperty('--dx', Math.round(dx * 0.7) + 'px');
       t.style.setProperty('--dy', Math.round(dy * 0.7) + 'px');
-      t.style.animationDelay = (Math.sqrt(dx * dx + dy * dy) * 0.00028).toFixed(3) + 's';
+      t.style.animationDelay = (Math.sqrt(dx * dx + dy * dy) * 0.00016).toFixed(3) + 's';
     }
     cmd.classList.add('pop');
     clearTimeout(C.popT);
-    C.popT = setTimeout(function () { cmd.classList.remove('pop'); }, 1300);
+    C.popT = setTimeout(function () { cmd.classList.remove('pop'); }, 900);
   }
   C.leave = function () { if (C.orb) C.orb.stop(); };
   C.resume = function () { if (C.orb) C.orb.start(); }; // back from Home settings
@@ -796,11 +836,13 @@
   };
   F.load = function () {
     var seq = ++F.loadSeq, g = F.genres[F.g], type = F.cat === 'movies' ? 'movie' : 'series';
+    F.loading = true;
     $('fyMsg').textContent = 'Loading from Stremio…';
     var p = F.cat === 'anime' ? Data.anime(g)
       : Data.picks(type, g === 'Popular' || g === 'Featured' ? '' : g, g === 'Featured' ? 'imdbRating' : 'top');
     p.then(function (items) {
       if (seq !== F.loadSeq) return;
+      F.loading = false;
       F.items = items; F.idx = 0; F.tx = 0;
       $('fyMsg').textContent = items.length ? '' : 'Nothing in ' + g + ' right now.';
       $('fyRow').innerHTML = items.map(function (m) { return '<img src="' + esc(m.poster) + '" alt="">'; }).join('');
@@ -861,9 +903,11 @@
       fetch(url).then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.blob(); })
         .then(function (b) { return createImageBitmap(b, { resizeWidth: c.width + 16, resizeQuality: 'medium' }); })
         .then(function (bm) { draw(bm, bm.width, bm.height); }, viaImage);
-    }, 250);
+    }, 180);
   }
-  F.enter = function () { F.area = 'row'; if (!F.items.length) F.load(); F.paint(); };
+  F.enter = function () { F.area = 'row'; if (!F.items.length && !F.loading) F.load(); F.paint(); };
+  // Load For You a few seconds after start, so opening it is instant.
+  setTimeout(function () { if (!F.items.length) F.load(); }, 4000);
   F.key = function (k) {
     var n = F.items.length, ga = F.genres.length;
     if (F.area === 'wheel') {
@@ -910,9 +954,11 @@
   T.sections = [
     { name: 'Appearance', icon: I.image, rows: function () {
       var c = cyc('clock', ['12', '24'], ['12-hour', '24-hour'], '12');
+      var ic = cyc('icons', ['nothing', 'colour'], ['Nothing style', 'Original colours'], 'nothing');
       return [
         { lbl: 'LOOK' }, { b: 'Clean', s: 'Glass clock behind the mountain, app dock, Jarvis at the end', val: 'On' },
         { b: 'Clock', s: 'How the time is written', val: c.val, a: c.a },
+        { b: 'App icons', s: 'Nothing style: white icons on dark glass. Or each app\'s own colours', val: ic.val, a: function () { ic.a(); H.build(); } },
         { lbl: 'SCENES' }, { img: 'img/scene-night.jpg', b: 'Night', s: 'Home: the clock sits behind the mountain', val: 'On' },
         { img: 'img/f1-suzuka.jpg', b: 'F1', s: 'Screensaver photo', val: 'On' }
       ];

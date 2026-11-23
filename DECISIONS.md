@@ -17,3 +17,5 @@
 - 2026-11-23: Everything sits at least 96px from the screen edges because TVs crop the edges.
 - 2026-11-23: For You shows small Cinemeta images (480x270 backdrops, 300x450 posters); medium backdrops are 1 MB and took 100+ ms to decode on the TV.
 - 2026-11-23: Anime in For You comes from Stremio's Anime Kitsu catalog (metadata only). Undo: drop the Anime tab in index.html and app.js.
+- 2026-11-23: Dock icons default to Nothing style (white line icons on dark glass; a dot-matrix letter for apps without one). Undo: Home settings > Appearance > App icons > Original colours. Colour icons now keep their shape instead of being squashed into squares.
+- 2026-11-23: Animations about a third quicker everywhere (you found it slow), and For You loads in the background 4 seconds after start. The dock's liquid drop is unchanged (you said it is perfect).
