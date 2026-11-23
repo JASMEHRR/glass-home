@@ -129,15 +129,23 @@
   function go(name, arg) {
     var prev = top();
     if (name === 'expanded' && prev !== 'expanded') $('expanded').setAttribute('data-over', prev);
+    if (!OVERLAY[name] && name !== 'ambient') fromDream = false;
     if (OVERLAY[name]) { overlays = overlays.filter(function (n) { return n !== name; }); overlays.push(name); }
     else { if (base !== name && S[base].leave) S[base].leave(); overlays.forEach(function (n) { if (S[n].leave) S[n].leave(); }); base = name; overlays = []; }
     paintOn();
     if (S[name].enter) S[name].enter(arg);
     resetIdle();
   }
+  var fromDream = false; // the TV's screensaver opened us over another app: Back returns to it
   function back() {
     var t = top();
     if (S[t].back && S[t].back()) return;
+    if (fromDream && t === 'ambient' && !overlays.length) {
+      fromDream = false;
+      GH.leaveDream();
+      setTimeout(function () { go('home'); H.first(); }, 400);
+      return;
+    }
     if (overlays.length) {
       overlays.pop();
       if (S[t].leave) S[t].leave();
@@ -1271,7 +1279,8 @@
     key: key,
     back: back,
     go: function (name, arg) { if (S[name]) go(name, arg); },
-    home: function () { go('home'); H.first(); },
+    home: function () { fromDream = false; go('home'); H.first(); },
+    dreamPending: function () { if (GH.takeDream && GH.takeDream()) { go('ambient'); fromDream = true; } },
     resume: function () { loadPrefs(); resetIdle(); var t = top(); if (S[t].resume) S[t].resume(); tick(); },
     pause: function () { clearTimeout(idleT); clearTimeout(sleepT); [H, A, J, C].forEach(function (s) { if (s.orb) s.orb.stop(); }); },
     appsChanged: function () { H.build();  setTimeout(relayPushAll, 1500); }, // installs/uninstalls: tell the phone page
@@ -1301,4 +1310,5 @@
     watched = now;
   }, 60000);
   window.UI.heardPending();
+  window.UI.dreamPending();
 })();

@@ -99,9 +99,25 @@ public final class MainActivity extends Activity {
         registerReceiver(packages, f);
         PhoneService.start(this);
         heard(getIntent());
+        dream(getIntent());
     }
 
     private volatile String pendingHeard;
+    private volatile boolean pendingDream;
+
+    /** Opened by Dream (the TV's screensaver): show Glass Home's own screensaver. */
+    private boolean dream(Intent i) {
+        if (i == null || !i.getBooleanExtra(Dream.EXTRA, false)) return false;
+        pendingDream = true;
+        js("window.UI&&UI.dreamPending()");
+        return true;
+    }
+
+    boolean takeDream() {
+        boolean d = pendingDream;
+        pendingDream = false;
+        return d;
+    }
 
     /** Words from the phone page: kept until the page asks for them (it may still be loading). */
     private void heard(Intent i) {
@@ -168,7 +184,7 @@ public final class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (intent != null && intent.hasExtra(PhoneService.HEARD)) heard(intent);
-        else js("window.UI&&UI.home()");
+        else if (!dream(intent)) js("window.UI&&UI.home()");
     }
 
     @Override

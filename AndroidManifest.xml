@@ -45,6 +45,18 @@
             </intent-filter>
         </activity>
 
+        <!-- The TV's screensaver: opens Glass Home's own (see Dream.java for how to select it). -->
+        <service
+            android:name=".Dream"
+            android:exported="true"
+            android:label="Glass Home"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
         <!-- Phone page for Jarvis (hold to talk), in its own small process. -->
         <service
             android:name=".PhoneService"

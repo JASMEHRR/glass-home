@@ -636,6 +636,17 @@ final class Bridge {
         return a.takeHeard();
     }
 
+    @JavascriptInterface
+    public boolean takeDream() {
+        return a.takeDream();
+    }
+
+    /** Leaving the screensaver the TV opened: back to the app that was on screen. */
+    @JavascriptInterface
+    public void leaveDream() {
+        a.runOnUiThread(() -> a.moveTaskToBack(true));
+    }
+
     void shutdown() {
         io.shutdownNow();
         if (tts != null) tts.shutdown();
