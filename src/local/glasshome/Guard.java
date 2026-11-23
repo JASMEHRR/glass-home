@@ -15,7 +15,9 @@ import android.os.SystemClock;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
+import android.os.Bundle;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
 
 /**
  * Puts Glass Home back when Fire OS shows Amazon's home screen, and puts the TV to sleep on request.
@@ -59,6 +61,71 @@ public final class Guard extends AccessibilityService {
         paused = true;
         Guard g = running;
         if (g != null) g.cancelRetry();
+    }
+
+    /**
+     * The phone remote inside other apps. Fire OS blocks apps from pressing keys (and from its own
+     * debugging port), so this moves the focus the way the D-pad would, clicks the focused item,
+     * types into the focused box, and uses the system's own Back and Home. Apps that draw their own
+     * interface (games, some players) may not respond to the arrows.
+     */
+    static boolean remote(String k, String text) {
+        Guard g = running;
+        if (g == null) return false;
+        switch (k == null ? "" : k) {
+            case "back": return g.performGlobalAction(GLOBAL_ACTION_BACK);
+            case "home": return g.performGlobalAction(GLOBAL_ACTION_HOME);
+            case "up": return g.move(View.FOCUS_UP);
+            case "down": return g.move(View.FOCUS_DOWN);
+            case "left": return g.move(View.FOCUS_LEFT);
+            case "right": return g.move(View.FOCUS_RIGHT);
+            case "ok": return g.click();
+            case "type": return g.type(text == null ? "" : text, false);
+            case "del": return g.type("", true);
+            default: return false;
+        }
+    }
+
+    private AccessibilityNodeInfo focused() {
+        AccessibilityNodeInfo f = findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+        if (f != null) return f;
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        return root == null ? null : firstFocusable(root, 0);
+    }
+
+    private static AccessibilityNodeInfo firstFocusable(AccessibilityNodeInfo n, int depth) {
+        if (n == null || depth > 40) return null;
+        if (n.isFocusable() && n.isVisibleToUser()) return n;
+        for (int i = 0; i < n.getChildCount(); i++) {
+            AccessibilityNodeInfo hit = firstFocusable(n.getChild(i), depth + 1);
+            if (hit != null) return hit;
+        }
+        return null;
+    }
+
+    private boolean move(int direction) {
+        AccessibilityNodeInfo f = focused();
+        if (f == null) return false;
+        if (!f.isFocused()) return f.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+        AccessibilityNodeInfo next = f.focusSearch(direction);
+        return next != null && next.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+    }
+
+    private boolean click() {
+        for (AccessibilityNodeInfo n = focused(); n != null; n = n.getParent()) {
+            if (n.isClickable()) return n.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        }
+        return false;
+    }
+
+    private boolean type(String text, boolean deleteOne) {
+        AccessibilityNodeInfo f = findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+        if (f == null || !f.isEditable()) return false;
+        CharSequence now = f.getText() == null ? "" : f.getText();
+        String value = deleteOne ? (now.length() > 0 ? now.subSequence(0, now.length() - 1).toString() : "") : text;
+        Bundle b = new Bundle();
+        b.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value);
+        return f.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, b);
     }
 
     /** Puts the TV to sleep (screen off), as the power button does. False without the service. */

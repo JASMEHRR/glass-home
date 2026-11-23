@@ -29,6 +29,16 @@ textarea:focus, input:focus { border-color: rgba(103,232,249,.6); }
 label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700; color: var(--muted); margin: 14px 0 6px; }
 .ok { color: var(--cyan); font-size: 14px; margin-top: 10px; min-height: 18px; }
 .hide { display: none; }
+/* remote */
+.pad { position: relative; width: 260px; height: 260px; margin: 6px auto 4px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.1), rgba(255,255,255,.03)); border: 1px solid rgba(255,255,255,.16); touch-action: manipulation; }
+.pad button, .row button { border: 0; color: #fff; background: none; font: 700 15px system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+.pad button { position: absolute; width: 86px; height: 86px; border-radius: 50%; font-size: 26px; }
+.pad button:active, .row button:active { background: rgba(103,232,249,.25); }
+.pad .u { left: 87px; top: 0; } .pad .d { left: 87px; bottom: 0; } .pad .l { left: 0; top: 87px; } .pad .r { right: 0; top: 87px; }
+.pad .ok { left: 80px; top: 80px; width: 100px; height: 100px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); font-size: 17px; }
+.row { display: flex; gap: 8px; margin-top: 12px; }
+.row button { flex: 1; padding: 14px 0; border-radius: 16px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); }
+.state { text-align: center; font-size: 13px; color: var(--muted); margin-top: 8px; min-height: 18px; }
 </style>
 </head>
 <body>
@@ -42,9 +52,29 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
 </div>
 
 <div id="app" class="hide">
-  <div class="tabs"><button class="on" data-t="talk">TALK</button><button data-t="set">ACCOUNTS</button></div>
+  <div class="tabs"><button class="on" data-t="remote">REMOTE</button><button data-t="talk">JARVIS</button><button data-t="set">ACCOUNTS</button></div>
 
-  <div id="talk">
+  <div id="remote">
+    <div class="card">
+      <div class="pad" id="pad">
+        <button class="u" data-k="up" aria-label="Up">&#9650;</button>
+        <button class="l" data-k="left" aria-label="Left">&#9664;</button>
+        <button class="ok" data-k="ok">OK</button>
+        <button class="r" data-k="right" aria-label="Right">&#9654;</button>
+        <button class="d" data-k="down" aria-label="Down">&#9660;</button>
+      </div>
+      <div class="row"><button data-k="back">Back</button><button data-k="home">Home</button><button data-k="menu">Menu</button></div>
+      <div class="row"><button data-k="rew">&#9194;</button><button data-k="play">&#9199;</button><button data-k="ffwd">&#9193;</button></div>
+      <div class="row"><button data-k="voldown">Vol &minus;</button><button data-k="mute">Mute</button><button data-k="volup">Vol +</button></div>
+      <div class="state" id="rstate"></div>
+    </div>
+    <div class="card">
+      <input id="typeText" autocomplete="off" placeholder="Type into the search box on the TV">
+      <div class="row"><button id="typeGo">Type on TV</button><button data-k="del">Delete</button></div>
+    </div>
+  </div>
+
+  <div id="talk" class="hide">
     <div class="card">
       <textarea id="text" placeholder="Tap here, then the mic on your keyboard, and talk to Jarvis"></textarea>
       <button class="send" id="sendBtn">Send to Jarvis</button>
@@ -90,7 +120,7 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
     return fetch(path + '?pin=' + encodeURIComponent(pin), { cache: 'no-store' }).then(function (r) { if (r.status === 403) throw new Error('pin'); return r.json(); });
   }
   function needPin(msg) { $('app').classList.add('hide'); $('gate').classList.remove('hide'); $('pinMsg').textContent = msg || ''; }
-  function ready() { $('gate').classList.add('hide'); $('app').classList.remove('hide'); poll(); loadSettings(); }
+  function ready() { $('gate').classList.add('hide'); $('app').classList.remove('hide'); poll(); loadSettings(); remoteState(); }
 
   $('pinGo').onclick = function () {
     pin = $('pin').value.trim();
@@ -112,9 +142,29 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
     b.onclick = function () {
       Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (x) { x.classList.toggle('on', x === b); });
       $('talk').classList.toggle('hide', b.getAttribute('data-t') !== 'talk');
+      $('remote').classList.toggle('hide', b.getAttribute('data-t') !== 'remote');
       $('set').classList.toggle('hide', b.getAttribute('data-t') !== 'set');
     };
   });
+
+  // ---- remote ----
+  var STATES = { ready: 'Remote ready', home: 'Make Glass Home the TV\'s Home screen first: the remote works through it.' };
+  function showState(s) { $('rstate').textContent = STATES[s] || ('Remote problem: ' + s); }
+  function key(k) {
+    if (navigator.vibrate) navigator.vibrate(12);
+    post('/api/key', { k: k }).then(function (r) { showState(r.state); })
+      .catch(function (e) { if (e.message === 'pin') needPin('Enter the PIN again.'); else showState('the TV did not answer'); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('#remote [data-k]'), function (b) {
+    b.addEventListener('click', function () { key(b.getAttribute('data-k')); });
+  });
+  $('typeGo').onclick = function () {
+    var t = $('typeText').value;
+    if (!t) return;
+    post('/api/type', { text: t }).then(function (r) { showState(r.state); if (r.ok) $('typeText').value = ''; })
+      .catch(function () { showState('the TV did not answer'); });
+  };
+  function remoteState() { get('/api/remote').then(function (r) { showState(r.state); }).catch(function () { /* shown elsewhere */ }); }
 
   function poll() {
     get('/api/log').then(function (list) {

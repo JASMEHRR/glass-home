@@ -65,6 +65,7 @@ final class Bridge {
     static final String DEFAULT_ORDER = "local.sendtotv,org.smarttube.stable,com.stremio.one,com.amazon.firebat";
     static final String STREMIO = "com.stremio.one";
     static final String APPSTORE = "com.amazon.venezia";
+    static final String SMARTTUBE = "org.smarttube.stable";
     static final String SPEED_URL = "https://speed.cloudflare.com/__down?bytes=25000000";
 
     private final MainActivity a;
@@ -229,6 +230,25 @@ final class Bridge {
                 .setPackage(STREMIO).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         if (i.resolveActivity(a.getPackageManager()) != null && start(i)) return true;
         return launch(STREMIO);
+    }
+
+    /** Jarvis's "play X on Stremio" / "search X on YouTube": opens that app's search for X. */
+    @JavascriptInterface
+    public boolean searchIn(String app, String query) {
+        String q = query == null ? "" : query.trim();
+        if (q.isEmpty() || q.length() > 120) return false;
+        String enc = Uri.encode(q);
+        Intent i;
+        if ("stremio".equals(app)) {
+            i = new Intent(Intent.ACTION_VIEW, Uri.parse("stremio:///search?search=" + enc)).setPackage(STREMIO);
+        } else if ("youtube".equals(app)) {
+            i = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=" + enc)).setPackage(SMARTTUBE);
+        } else {
+            return false;
+        }
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (i.resolveActivity(a.getPackageManager()) != null && start(i)) return true;
+        return launch("stremio".equals(app) ? STREMIO : SMARTTUBE);
     }
 
     // ---- settings and system --------------------------------------------------------------

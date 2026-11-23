@@ -25,3 +25,8 @@
 - 2026-11-23: Remote buttons other than the D-pad are logged (tag GlassHome) to find out whether the mic button reaches Glass Home. Undo: remove the log line in MainActivity.dispatchKeyEvent.
 - 2026-11-23 4:50 PM: At your request Glass Home is the Home screen (accessibility service swapped to local.glasshome/local.glasshome.Guard) and dumbtv is uninstalled. Backup: backup/dumbtv-1.9.apk. Undo: adb install backup/dumbtv-1.9.apk, then set enabled_accessibility_services back to tv.dumbtv.home/tv.dumbtv.home.Guard.
 - 2026-11-23: Remote mic tested: the button and audio go to Alexa only, never to apps. Voice to Jarvis via the remote needs an Alexa skill ("Alexa, ask Jarvis ...").
+- 2026-11-23: Phone remote goes through Glass Home's accessibility service (moves focus, clicks, types, Back/Home), because Fire OS blocks apps from pressing keys and resets app connections to its own debugging port (tested: laptop gets a reply, the TV's own apps get reset). Apps that draw their own UI may ignore the arrows. The service now reads window content to do this (Android switched it off once on that update; switched back on).
+- 2026-11-23: Jarvis understands "play/watch/find X on Stremio" and "search X on YouTube" (opens Stremio's search or SmartTube's YouTube search).
+- 2026-11-23: Home scene follows the time (Dawn 5-9 AM, Golden 9 AM-4:30 PM, Fog 4:30-6:30 PM, Night after); pick one in Home settings > Appearance. Scenes from tvOS Launcher (Apache-2.0).
+- 2026-11-23: Screensaver rotates 4 F1 photos by Takayuki Suzuki (CC BY-SA 2.0, Wikimedia Commons, credited on screen): next one each start and every 10 minutes. APK is now 3.4 MB because of the photos.
+- 2026-11-23: Command Center drops in from the top (iOS-like) instead of popping out of its button.

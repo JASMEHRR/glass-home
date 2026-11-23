@@ -176,6 +176,47 @@
     if (sm > 0) sleepT = setTimeout(function () { if (GH.guardOn()) GH.sleep(); }, sm * 60000);
   }
 
+  // ---- Home scene and screensaver photo -----------------------------------------------------------
+  // Home follows the time of day (or the scene picked in Home settings); the screensaver moves on to
+  // the next F1 photo each time it starts and every 10 minutes while it shows.
+  var SCENES = { dawn: 'Dawn', golden: 'Golden', fog: 'Fog', night: 'Night' };
+  var F1 = [
+    { n: 'suzuka', pos: '50% 40%', credit: 'PHOTO: TAKAYUKI SUZUKI, CC BY-SA 2.0' },
+    { n: 'alonso', pos: '50% 50%', credit: 'PHOTO: TAKAYUKI SUZUKI, CC BY-SA 2.0' },
+    { n: 'verstappen', pos: '50% 0%', credit: 'PHOTO: TAKAYUKI SUZUKI, CC BY-SA 2.0' },
+    { n: 'bottas', pos: '50% 60%', credit: 'PHOTO: TAKAYUKI SUZUKI, CC BY-SA 2.0' }
+  ];
+  function sceneNow(d) {
+    var pick = pref('scene', 'auto');
+    if (SCENES[pick]) return pick;
+    var h = d.getHours() + d.getMinutes() / 60;
+    return h >= 5 && h < 9 ? 'dawn' : h >= 9 && h < 16.5 ? 'golden' : h >= 16.5 && h < 18.5 ? 'fog' : 'night';
+  }
+  var shownScene = '';
+  function applyScene(d) {
+    var s = sceneNow(d || new Date());
+    if (s === shownScene) return;
+    shownScene = s;
+    var root = document.documentElement.style, g = 'img/scene-' + s + '-glass.jpg';
+    $('homeBg').src = 'img/scene-' + s + '.jpg';
+    $('homeFg').src = 'img/scene-' + s + '-fg.webp';
+    root.setProperty('--home-glass', 'url(' + g + ')');
+    root.setProperty('--home-frost', 'url(img/scene-' + s + '-frost.jpg)');
+    Array.prototype.forEach.call(document.querySelectorAll('img.homeglass'), function (im) { im.src = g; });
+  }
+  function nextF1() {
+    var i = (+pref('f1.photo', 0) + 1) % F1.length, p = F1[i];
+    setPref('f1.photo', i);
+    var root = document.documentElement.style, g = 'img/f1-' + p.n + '-glass.jpg';
+    $('ambBg').src = 'img/f1-' + p.n + '.jpg';
+    $('ambBg').style.objectPosition = p.pos;
+    $('ambCredit').textContent = p.credit;
+    root.setProperty('--f1-glass', 'url(' + g + ')');
+    root.setProperty('--f1-frost', 'url(img/f1-' + p.n + '-frost.jpg)');
+    Array.prototype.forEach.call(document.querySelectorAll('img.f1glass'), function (im) { im.src = g; });
+  }
+  applyScene();
+
   // ---- clock tick ----------------------------------------------------------------------------
   function tick() {
     var now = new Date(), h24 = pref('clock', '12') === '24';
@@ -190,6 +231,8 @@
     if (amb.firstElementChild) amb.firstElementChild.classList.toggle('dim', now.getSeconds() % 2 === 1);
     setText($('homeGreet'), Data.greeting(now) + ', ' + pref('name', 'JasMehr'));
     setText($('homeDate'), Data.longDate(now));
+    if (now.getSeconds() === 0) applyScene(now);
+    if (top() === 'ambient' && now.getMinutes() % 10 === 0 && now.getSeconds() === 0) nextF1();
     paintRaceCount();
     if (top() === 'ambient') { paintChipTimers(); if (now.getSeconds() % 5 === 0 && pollMusic()) paintChips(); }
     if (top() === 'expanded') S.expanded.tick();
@@ -220,6 +263,7 @@
     'com.amazon.cloud9': '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
     'com.amazon.firetv.youtube': '<path d="M2.5 17a24 24 0 0 1 0-10 2 2 0 0 1 1.4-1.4 50 50 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24 24 0 0 1 0 10 2 2 0 0 1-1.4 1.4 50 50 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/>',
     'com.google.android.youtube.tv': '<path d="M2.5 17a24 24 0 0 1 0-10 2 2 0 0 1 1.4-1.4 50 50 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24 24 0 0 1 0 10 2 2 0 0 1-1.4 1.4 50 50 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/>',
+    'com.fancode.tv': '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
     'com.spotify.tv.android': '<path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/>'
   };
   var DOTS = {
@@ -280,6 +324,7 @@
     var ts = tiles(), t = ts[H.idx];
     ts.forEach(function (el, i) { if (el.classList) el.classList.toggle('focus', H.area === 'dock' && i === H.idx); });
     $('ccBtn').classList.toggle('focus', H.area === 'cc');
+    $('phoneBtn').classList.toggle('focus', H.area === 'phone');
     if (H.orb) H.orb.focus(H.area === 'dock' && H.items[H.idx] && H.items[H.idx].kind === 'jarvis');
     var lens = $('lens'), tip = $('dockTip');
     if (H.area !== 'dock' || !t) { lens.classList.remove('show'); tip.style.opacity = 0; return; }
@@ -382,8 +427,15 @@
   H.leave = function () { if (H.orb) H.orb.stop(); };
   H.key = function (k) {
     if (H.area === 'cc') {
-      if (k === 'down' || k === 'left') { H.area = 'dock'; H.paint(); }
+      if (k === 'left') { H.area = 'phone'; H.paint(); }
+      else if (k === 'down') { H.area = 'dock'; H.paint(); }
       else if (k === 'ok') go('command');
+      return;
+    }
+    if (H.area === 'phone') {
+      if (k === 'right') { H.area = 'cc'; H.paint(); }
+      else if (k === 'down') { H.area = 'dock'; H.paint(); }
+      else if (k === 'ok') go('jarvis'); // its QR opens the phone page: remote + Jarvis
       return;
     }
     var n = H.items.length;
@@ -514,6 +566,7 @@
     if (A.orb) A.orb.focus(onJ);
   };
   A.enter = function () {
+    nextF1();
     A.idx = -1;
     paintChips();
     if (!A.orb) A.orb = new Orb($('ambOrb'), 200);
@@ -692,6 +745,7 @@
   function act(r) {
     var a = r.act || {};
     if (a.type === 'open') { reply(r.say); setTimeout(function () { GH.launch(a.id); }, 900); return; }
+    if (a.type === 'search') { reply(r.say + ' Use the phone remote to pick one.'); setTimeout(function () { GH.searchIn(a.app, a.q); }, 900); return; }
     if (a.type === 'media') { GH.media(a.action); reply(r.say); return; }
     if (a.type === 'screen') { back(); go(a.name); return; }
     if (a.type === 'sleep') { reply(r.say); setTimeout(function () { if (!GH.sleep()) toast('Sleep works once Glass Home holds the Home button.'); }, 1500); return; }
@@ -765,17 +819,14 @@
     if (C.orb) C.orb.focus(C.idx === 8);
   };
   C.enter = function () { C.idx = 0; status(); C.render(); ccPop(); };
-  // iOS-style opening: each tile springs out of the Command Center button (see .pop in style.css).
-  // Only on opening; tiles re-render after some actions and should not replay it then.
+  // iOS-style opening: the panel drops in from the top, each row a beat behind (see .pop in
+  // style.css). Only on opening; tiles re-render after some actions and should not replay it then.
   function ccPop() {
-    var cmd = $('command'), b = $('ccBtn'), bp = offsetIn(b, stage);
-    var bx = bp[0] + b.offsetWidth / 2, by = bp[1] + b.offsetHeight / 2;
+    var cmd = $('command');
     var tiles = cmd.querySelectorAll('.pill, .sqb');
     for (var i = 0; i < tiles.length; i++) {
-      var t = tiles[i], p = offsetIn(t, stage), dx = bx - (p[0] + t.offsetWidth / 2), dy = by - (p[1] + t.offsetHeight / 2);
-      t.style.setProperty('--dx', Math.round(dx * 0.7) + 'px');
-      t.style.setProperty('--dy', Math.round(dy * 0.7) + 'px');
-      t.style.animationDelay = (Math.sqrt(dx * dx + dy * dy) * 0.00016).toFixed(3) + 's';
+      var row = Math.round((offsetIn(tiles[i], stage)[1] - 120) / 136);
+      tiles[i].style.animationDelay = (0.03 + Math.max(0, row) * 0.035).toFixed(3) + 's';
     }
     cmd.classList.add('pop');
     clearTimeout(C.popT);
@@ -984,12 +1035,14 @@
     { name: 'Appearance', icon: I.image, rows: function () {
       var c = cyc('clock', ['12', '24'], ['12-hour', '24-hour'], '12');
       var ic = cyc('icons', ['nothing', 'colour'], ['Nothing style', 'Original colours'], 'nothing');
+      var sc = cyc('scene', ['auto', 'night', 'dawn', 'golden', 'fog'], ['By time of day', 'Night', 'Dawn', 'Golden', 'Fog'], 'auto');
       return [
         { lbl: 'LOOK' }, { b: 'Clean', s: 'Glass clock behind the mountain, app dock, Jarvis at the end', val: 'On' },
         { b: 'Clock', s: 'How the time is written', val: c.val, a: c.a },
         { b: 'App icons', s: 'Nothing style: white icons on dark glass. Or each app\'s own colours', val: ic.val, a: function () { ic.a(); H.build(); } },
-        { lbl: 'SCENES' }, { img: 'img/scene-night.jpg', b: 'Night', s: 'Home: the clock sits behind the mountain', val: 'On' },
-        { img: 'img/f1-suzuka.jpg', b: 'F1', s: 'Screensaver photo', val: 'On' }
+        { lbl: 'SCENES' },
+        { img: 'img/scene-' + sceneNow(new Date()) + '.jpg', b: 'Home scene', s: 'Changes with the time of day: dawn, golden day, fog at dusk, night', val: sc.val, a: function () { sc.a(); shownScene = ''; applyScene(); } },
+        { img: 'img/f1-suzuka.jpg', b: 'Screensaver', s: 'A new F1 photo each time it starts, and every 10 minutes', val: F1.length + ' photos' }
       ];
     } },
     { name: 'Screensaver', icon: I.moon, rows: function () {

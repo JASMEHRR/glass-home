@@ -97,6 +97,8 @@ public final class PhoneService extends Service {
             case "next": code = KeyEvent.KEYCODE_MEDIA_NEXT; break;
             case "previous": code = KeyEvent.KEYCODE_MEDIA_PREVIOUS; break;
             case "play_pause": code = KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE; break;
+            case "rewind": code = KeyEvent.KEYCODE_MEDIA_REWIND; break;
+            case "fast_forward": code = KeyEvent.KEYCODE_MEDIA_FAST_FORWARD; break;
             default: return false;
         }
         AudioManager am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
@@ -117,6 +119,18 @@ public final class PhoneService extends Service {
             case "previous": case "go back": case "previous song": return "previous";
             default: return null;
         }
+    }
+
+    /** "ready" when Glass Home's accessibility service (which presses for the remote) is switched on. */
+    private String remoteState() {
+        String on = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        return on != null && on.contains(getPackageName() + "/") ? "ready" : "home";
+    }
+
+    private void volume(String k) {
+        AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        int dir = "volup".equals(k) ? AudioManager.ADJUST_RAISE : "voldown".equals(k) ? AudioManager.ADJUST_LOWER : AudioManager.ADJUST_TOGGLE_MUTE;
+        am.adjustSuggestedStreamVolume(dir, AudioManager.USE_DEFAULT_STREAM_TYPE, AudioManager.FLAG_SHOW_UI);
     }
 
     @Override
@@ -233,6 +247,22 @@ public final class PhoneService extends Service {
                 boolean ok = settingAllowed(k, v);
                 if (ok) Prefs.get(this).set(k, v.isEmpty() ? null : v);
                 send(out, ok ? 200 : 400, "application/json", ("{\"ok\":" + ok + "}").getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            if (("/api/key".equals(path) || "/api/type".equals(path)) && "POST".equals(method)) {
+                String k = "/api/type".equals(path) ? "type" : q.getOrDefault("k", "");
+                String media = "play".equals(k) ? "play_pause" : "rew".equals(k) ? "rewind" : "ffwd".equals(k) ? "fast_forward" : null;
+                if (media != null) mediaKey(this, media);
+                else if (k.startsWith("vol") || "mute".equals(k)) volume(k);
+                else sendBroadcast(new Intent(this, RemoteReceiver.class).putExtra(RemoteReceiver.KEY, k)
+                        .putExtra(RemoteReceiver.TEXT, q.getOrDefault("text", "").trim()));
+                send(out, 200, "application/json", new JSONObject().put("ok", true).put("state", remoteState())
+                        .toString().getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            if ("/api/remote".equals(path)) {
+                send(out, 200, "application/json", new JSONObject().put("state", remoteState())
+                        .toString().getBytes(StandardCharsets.UTF_8));
                 return;
             }
             if ("/api/settings".equals(path)) {

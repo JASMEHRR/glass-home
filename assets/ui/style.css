@@ -1,5 +1,8 @@
 /* Glass Home. 1920x1080 design space, scaled to the screen by app.js. */
 :root {
+  /* the current Home scene and screensaver photo (app.js applyScenes switches these) */
+  --home-glass: url(img/scene-night-glass.jpg); --home-frost: url(img/scene-night-frost.jpg);
+  --f1-glass: url(img/f1-suzuka-glass.jpg); --f1-frost: url(img/f1-suzuka-frost.jpg);
   --text: #fff;
   --muted: rgba(255,255,255,.72);
   --faint: rgba(255,255,255,.45);
@@ -65,7 +68,7 @@ canvas { will-change: transform; }
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: brightness(1.5) saturate(1.2) drop-shadow(0 10px 30px rgba(20,10,40,.25));
 }
-#home .gclock { background-image: linear-gradient(180deg, rgba(255,255,255,.42), rgba(235,228,255,.18)), url(img/scene-night-glass.jpg); }
+#home .gclock { background-image: linear-gradient(180deg, rgba(255,255,255,.42), rgba(235,228,255,.18)), var(--home-glass); }
 #home .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(2,4,10,.32) 0%, rgba(2,4,10,0) 22%, rgba(2,4,10,0) 70%, rgba(2,4,10,.38) 100%); }
 #home .hello { position: absolute; left: 0; right: 0; top: 68px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-shadow: 0 2px 14px rgba(0,0,0,.35); }
 #home .hello .g { font-weight: 600; font-size: 30px; color: rgba(255,255,255,.85); }
@@ -73,17 +76,18 @@ canvas { will-change: transform; }
 .dot-sep { color: rgba(255,255,255,.55); }
 .cc-btn {
   position: absolute; right: 96px; top: 60px; width: 86px; height: 86px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  background-image: linear-gradient(135deg, rgba(255,255,255,.22), rgba(255,255,255,.08)), url(img/scene-night-frost.jpg);
+  background-image: linear-gradient(135deg, rgba(255,255,255,.22), rgba(255,255,255,.08)), var(--home-frost);
   border: 1px solid rgba(255,255,255,.35); box-shadow: inset 0 1.5px 0 rgba(255,255,255,.6), 0 12px 30px -8px rgba(0,0,0,.5);
   transition: transform .25s var(--ease-spring), background .2s, box-shadow .2s;
 }
+.cc-btn.phone { right: 202px; }
 .cc-btn.focus { transform: scale(1.12); background: rgba(255,255,255,.92); box-shadow: 0 0 0 5px rgba(255,255,255,.2), 0 16px 36px rgba(0,0,0,.45); }
 .cc-btn.focus svg { stroke: #111; }
 .cc-btn.focus svg circle { fill: #111; }
 .dockwrap { position: absolute; left: 0; right: 0; bottom: 54px; display: flex; justify-content: center; }
 .dock {
   position: relative; display: flex; align-items: center; gap: 20px; padding: 18px; border-radius: 46px; max-width: 1700px;
-  background-image: linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,.08)), url(img/scene-night-frost.jpg);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,.08)), var(--home-frost);
   border: 1px solid rgba(255,255,255,.32); box-shadow: inset 0 1.5px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(0,0,0,.12), 0 24px 50px -14px rgba(0,0,0,.65);
 }
 .dock .track { display: flex; align-items: center; gap: 20px; transition: transform .3s var(--ease-out); }
@@ -111,7 +115,7 @@ canvas { will-change: transform; }
 
 /* ---------- Screensaver ---------- */
 #ambient .gclock { left: 96px; top: 46px; width: auto; height: 200px; background-position: -96px -46px, -96px -46px; text-align: left; font-size: 200px; letter-spacing: -3px; -webkit-text-stroke: 1.5px rgba(255,255,255,.6); filter: drop-shadow(0 10px 28px rgba(0,0,0,.35));
-  background-image: linear-gradient(180deg, rgba(255,255,255,.38), rgba(255,236,220,.12)), url(img/f1-suzuka-glass.jpg); }
+  background-image: linear-gradient(180deg, rgba(255,255,255,.38), rgba(255,236,220,.12)), var(--f1-glass); }
 /* Colon blink: a class tick() flips each second. A CSS animation here kept the clock (and its
    shadow filter) on a separate layer that the TV re-blurred every frame. */
 #ambient .gclock .c.dim { opacity: .25; }
@@ -124,7 +128,7 @@ canvas { will-change: transform; }
 .chips { position: absolute; left: 96px; bottom: 64px; display: flex; gap: 18px; align-items: flex-end; }
 .chip {
   width: 120px; height: 120px; flex: none; position: relative; overflow: hidden; border-radius: 38px;
-  background-image: linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.04)), url(img/f1-frost.jpg);
+  background-image: linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.04)), var(--f1-frost);
   border: 1px solid rgba(255,255,255,.24); box-shadow: inset 0 1px 0 rgba(255,255,255,.4);
   transition: width .45s var(--ease-spring), height .45s var(--ease-spring), border-radius .4s ease, box-shadow .3s ease;
 }
@@ -152,8 +156,8 @@ canvas { will-change: transform; }
 
 /* ---------- Expanded view ---------- */
 /* Baked glass again (see .frost): the blurred screen underneath, from data-over set by go(). */
-#expanded .veil { position: absolute; inset: 0; background: linear-gradient(rgba(2,4,10,.45), rgba(2,4,10,.45)), url(img/f1-frost.jpg) 0 0 / 1920px 1080px no-repeat; }
-#expanded[data-over="settings"] .veil { background-image: linear-gradient(rgba(2,4,10,.6), rgba(2,4,10,.6)), url(img/scene-night-glass.jpg); }
+#expanded .veil { position: absolute; inset: 0; background: linear-gradient(rgba(2,4,10,.45), rgba(2,4,10,.45)), var(--f1-frost) 0 0 / 1920px 1080px no-repeat; }
+#expanded[data-over="settings"] .veil { background-image: linear-gradient(rgba(2,4,10,.6), rgba(2,4,10,.6)), var(--home-glass); }
 #expanded .panel { position: absolute; left: 50%; top: 50%; width: 760px; min-height: 420px; padding: 36px 40px; border-radius: 44px; transform: translate(-50%,-50%); }
 #expanded.on .panel { animation: grow .38s var(--ease-spring) backwards; }
 @keyframes grow { from { opacity: 0; transform: translate(-50%,-44%) scale(.86); } to { opacity: 1; transform: translate(-50%,-50%); } }
@@ -204,11 +208,13 @@ canvas { will-change: transform; }
 .sqb { height: 128px; border-radius: 30px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(60,62,70,.5), rgba(12,13,18,.65)); border: 2px solid rgba(255,255,255,.2); transition: transform .22s var(--ease-spring), background .15s; }
 .sqb.focus svg { stroke: #111; }
 .sqb.focus svg[fill="#fff"] { fill: #111; }
-/* iOS-style pop: every tile springs out of the Command Center button (app.js sets --dx/--dy, the
-   way back to the button, and --d, a stagger by distance), overshoots a touch and settles, while the
-   blurred backdrop eases in with a slight zoom. */
-#command.on.pop .pill, #command.on.pop .sqb { animation: ccpop .42s cubic-bezier(.3,1.42,.45,1) backwards; animation-delay: var(--d, 0s); }
-@keyframes ccpop { 0% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, 0px)) scale(.3); } 40% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+/* iOS-style drop: the panel falls in from above the screen with a springy overshoot, each row of
+   tiles trailing a beat behind (app.js sets the delays), while the blurred backdrop fades in. */
+#command.on.pop .grid, #command.on.pop .sq { animation: ccdrop .5s cubic-bezier(.25,1.22,.4,1) backwards; }
+#command.on.pop .sq { animation-delay: .05s; }
+@keyframes ccdrop { from { transform: translateY(-780px); } to { transform: none; } }
+#command.on.pop .pill, #command.on.pop .sqb { animation: ccrow .55s cubic-bezier(.3,1.3,.45,1) backwards; animation-delay: var(--d, 0s); }
+@keyframes ccrow { 0% { opacity: 0; transform: translateY(-60px) scale(.94); } 35% { opacity: 1; } 100% { opacity: 1; transform: none; } }
 #command.on.pop .bg { animation: ccbg .35s var(--ease-out) backwards; }
 @keyframes ccbg { from { transform: scale(1); opacity: .4; } to { transform: scale(1.08); opacity: 1; } }
 @keyframes slidein { from { opacity: 0; transform: translateX(60px) scale(.96); } to { opacity: 1; transform: none; } }

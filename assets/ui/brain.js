@@ -9,7 +9,7 @@
     [/\b(prime( video)?|amazon prime)\b/, 'com.amazon.firebat'],
     [/\bstremio\b/, 'com.stremio.one'],
     [/\b(send to tv|browser|web)\b/, 'local.sendtotv'],
-    [/\bfan ?code\b/, 'com.dream11sportsguru']
+    [/\bfan ?code\b/, 'com.fancode.tv']
   ];
   var SCREENS = [
     [/\b(for you|recommend|something to watch|what (should|can) i watch|tonight i want|suggest)\b/, 'foryou'],
@@ -73,6 +73,16 @@
     }
     if (/\b(free|clear|clean)( up)? (the )?(memory|ram)\b|\bspeed (it )?up\b/.test(t)) return { say: 'Freeing memory.', act: { type: 'memory' } };
     if (/\b(speed ?test|internet speed|how fast is (the|my) (internet|wifi|wi fi))\b/.test(t)) return { say: 'Testing the internet speed.', act: { type: 'speed' } };
+
+    // "play naruto on stremio", "search lofi on youtube", "find interstellar in stremio"
+    var srch = t.match(/^(play|watch|put on|find|search( for)?|look up|open) (.+?) (on|in) (stremio|you ?tube|smart ?tube)$/)
+      || t.match(/^(search|look up|find) (stremio|you ?tube|smart ?tube) for (.+)$/);
+    if (srch) {
+      // both patterns put the query in group 3
+      var q = srch[3], inStremio = /stremio$/.test(srch[0]) || /^(search|look up|find) stremio for /.test(srch[0]);
+      var where = inStremio ? 'stremio' : 'youtube';
+      return { say: 'Looking for ' + q + ' on ' + (where === 'stremio' ? 'Stremio' : 'YouTube') + '.', act: { type: 'search', app: where, q: q } };
+    }
 
     var open = t.match(/^(open|launch|start|go to|show me|show|put on|play) (.+)$/);
     if (open) {

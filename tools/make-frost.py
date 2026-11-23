@@ -61,9 +61,22 @@ def frost(src, out, stops, blur, sat, pos_y=0.5, fg=None):
     print("wrote", out)
 
 
-# Home: #home .shade, behind .dock (blur 22, saturate 180%) and .cc-btn (blur 20, saturate 170%).
-frost("scene-night.jpg", "scene-night-frost.jpg",
-      [(0, .32), (.22, 0), (.70, 0), (1, .38)], blur=22, sat=1.8, fg="scene-night-fg.webp")
-# Screensaver: f1 photo at object-position 50% 40%, #ambient .shade, behind .chip (blur 22, saturate 170%).
-frost("f1-suzuka.jpg", "f1-frost.jpg",
-      [(0, .5), (.30, 0), (.55, 0), (1, .66)], blur=22, sat=1.7, pos_y=0.4)
+def glass(src, out, blur=16, bright=1.5, pos_y=0.5):
+    """The pre-blurred, brightened photo the big glass clock shows through its digits."""
+    from PIL import ImageEnhance
+    im = cover(Image.open(IMG / src).convert("RGB"), pos_y).filter(ImageFilter.GaussianBlur(blur))
+    ImageEnhance.Brightness(im).enhance(bright).resize((W // 2, H // 2), Image.LANCZOS).save(IMG / out, quality=84, optimize=True)
+    print("wrote", out)
+
+
+HOME_SHADE = [(0, .32), (.22, 0), (.70, 0), (1, .38)]   # #home .shade
+AMB_SHADE = [(0, .5), (.30, 0), (.55, 0), (1, .66)]     # #ambient .shade
+
+# Home scenes (behind .dock: blur 22, saturate 180%); their glass images come from tvOS Launcher.
+for n in ("night", "dawn", "fog", "golden"):
+    frost("scene-%s.jpg" % n, "scene-%s-frost.jpg" % n, HOME_SHADE, blur=22, sat=1.8, fg="scene-%s-fg.webp" % n)
+# Screensaver photos (behind .chip: blur 22, saturate 170%), positions as in app.js F1.
+for n, pos in (("suzuka", .4), ("alonso", .5), ("verstappen", 0.0), ("bottas", .6)):
+    frost("f1-%s.jpg" % n, "f1-%s-frost.jpg" % n, AMB_SHADE, blur=22, sat=1.7, pos_y=pos)
+    if n != "suzuka":
+        glass("f1-%s.jpg" % n, "f1-%s-glass.jpg" % n, pos_y=pos)
