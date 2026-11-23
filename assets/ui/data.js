@@ -155,6 +155,53 @@
     out.sort(function (a, b) { return a.at - b.at; });
     return out.filter(function (x, i) { return out.findIndex(function (y) { return y.title === x.title; }) === i; }).slice(0, 6);
   };
+  // The For You "AniList" tab: your Watching / Planning lists with what is due and what airs next.
+  var ANI_LIST_Q = 'query($u:String){MediaListCollection(userName:$u,type:ANIME,status_in:[CURRENT,PLANNING,REPEATING]){lists{entries{status progress '
+    + 'media{id title{english romaji} coverImage{large} bannerImage episodes genres seasonYear averageScore nextAiringEpisode{episode airingAt}}}}}}';
+  Data.parseAniListFull = function (json, now) {
+    var seen = {}, out = [], lists = json && json.data && json.data.MediaListCollection ? json.data.MediaListCollection.lists : [];
+    now = now || Date.now();
+    (lists || []).forEach(function (l) {
+      (l.entries || []).forEach(function (e) {
+        var m = e.media;
+        if (!m || seen[m.id]) return;
+        seen[m.id] = true;
+        var next = m.nextAiringEpisode, progress = e.progress || 0;
+        var aired = next ? next.episode - 1 : (m.episodes || 0);
+        var due = e.status === 'PLANNING' ? 0 : Math.max(0, aired - progress);
+        var meta = due > 0 ? due + (due === 1 ? ' episode' : ' episodes') + ' to watch \u00b7 next is episode ' + (progress + 1)
+          : next ? 'Episode ' + next.episode + ' in ' + Data.shortLeft(next.airingAt * 1000 - now)
+          : e.status === 'PLANNING' ? 'Planning' + (m.episodes ? ' \u00b7 ' + m.episodes + ' episodes' : '') : 'All caught up';
+        out.push({ id: 'anilist:' + m.id, type: 'series', name: m.title.english || m.title.romaji, poster: m.coverImage ? m.coverImage.large : '',
+          background: m.bannerImage || '', genres: m.genres || [], year: m.seasonYear ? String(m.seasonYear) : '',
+          rating: m.averageScore ? (m.averageScore / 10).toFixed(1) : '', meta: meta, listStatus: e.status, due: due,
+          nextAt: next ? next.airingAt * 1000 : 0 });
+      });
+    });
+    out.sort(function (a, b) {
+      if (a.due || b.due) return b.due - a.due;
+      if (a.nextAt || b.nextAt) return (a.nextAt || 9e15) - (b.nextAt || 9e15);
+      return a.name.localeCompare(b.name);
+    });
+    return out;
+  };
+  Data.anilistList = function (user) {
+    if (!user) return Promise.reject(new Error('no-anilist'));
+    return Data.json('https://graphql.anilist.co', JSON.stringify({ query: ANI_LIST_Q, variables: { u: user } }), 900)
+      .then(function (j) { return Data.parseAniListFull(j); });
+  };
+  /** Is this anime on Stremio (Anime Kitsu catalog)? Resolves {type,id} of the best match, or null. */
+  Data.onStremio = function (title) {
+    var t = String(title || '').trim();
+    if (!t) return Promise.resolve(null);
+    var url = 'https://anime-kitsu.strem.fun/catalog/anime/kitsu-anime-list/search=' + encodeURIComponent(t) + '.json';
+    var norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); };
+    return Data.json(url, '', 86400).then(function (j) {
+      var metas = (j && j.metas) || [], want = norm(t);
+      var hit = metas.filter(function (m) { return norm(m.name) === want; })[0] || metas[0];
+      return hit && hit.id ? { type: hit.type === 'movie' ? 'movie' : 'series', id: hit.id } : null;
+    }).catch(function () { return null; });
+  };
   Data.anilist = function (user) {
     if (!user) return Promise.resolve(null);
     return Data.json('https://graphql.anilist.co', JSON.stringify({ query: ANI_Q, variables: { u: user } }), 3600).then(Data.parseAniList);

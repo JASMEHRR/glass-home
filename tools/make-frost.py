@@ -75,6 +75,11 @@ AMB_SHADE = [(0, .5), (.30, 0), (.55, 0), (1, .66)]     # #ambient .shade
 # Home scenes (behind .dock: blur 22, saturate 180%); their glass images come from tvOS Launcher.
 for n in ("night", "dawn", "fog", "golden"):
     frost("scene-%s.jpg" % n, "scene-%s-frost.jpg" % n, HOME_SHADE, blur=22, sat=1.8, fg="scene-%s-fg.webp" % n)
+# Extra Home scenes without a cut-out (the clock sits in front of the photo). Water ships its own glass.
+for n in ("water", "albury", "aresquiers", "grose", "tessellated", "vangvieng"):
+    frost("scene-%s.jpg" % n, "scene-%s-frost.jpg" % n, HOME_SHADE, blur=22, sat=1.8)
+    if n != "water":
+        glass("scene-%s.jpg" % n, "scene-%s-glass.jpg" % n)
 # Screensaver photos (behind .chip: blur 22, saturate 170%), positions as in app.js F1.
 for n, pos in (("suzuka", .4), ("alonso", .5), ("verstappen", 0.0), ("bottas", .6)):
     frost("f1-%s.jpg" % n, "f1-%s-frost.jpg" % n, AMB_SHADE, blur=22, sat=1.7, pos_y=pos)

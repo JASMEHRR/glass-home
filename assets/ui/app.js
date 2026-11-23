@@ -177,9 +177,13 @@
   }
 
   // ---- Home scene and screensaver photo -----------------------------------------------------------
-  // Home follows the time of day (or the scene picked in Home settings); the screensaver moves on to
-  // the next F1 photo each time it starts and every 10 minutes while it shows.
-  var SCENES = { dawn: 'Dawn', golden: 'Golden', fog: 'Fog', night: 'Night' };
+  // Home moves to the next scene every 30 minutes (or follows the time of day, or stays on the scene
+  // picked in Home settings); the screensaver moves on to the next F1 photo each time it starts and
+  // every 10 minutes while it shows. Scenes with fg have a cut-out drawn over the clock.
+  var SCENES = { night: { label: 'Night', fg: 1 }, dawn: { label: 'Dawn', fg: 1 }, golden: { label: 'Golden', fg: 1 }, fog: { label: 'Fog', fg: 1 },
+    water: { label: 'Water' }, albury: { label: 'Albury Storm' }, aresquiers: { label: 'Aresquiers Beach' }, grose: { label: 'Grose Valley' },
+    tessellated: { label: 'Tessellated Pavement' }, vangvieng: { label: 'Vang Vieng Sunset' } };
+  var SCENE_IDS = Object.keys(SCENES), ROTATE_MS = 30 * 60 * 1000;
   var F1 = [
     { n: 'suzuka', pos: '50% 40%', credit: 'PHOTO: TAKAYUKI SUZUKI, CC BY-SA 2.0' },
     { n: 'alonso', pos: '50% 50%', credit: 'PHOTO: TAKAYUKI SUZUKI, CC BY-SA 2.0' },
@@ -187,8 +191,9 @@
     { n: 'bottas', pos: '50% 60%', credit: 'PHOTO: TAKAYUKI SUZUKI, CC BY-SA 2.0' }
   ];
   function sceneNow(d) {
-    var pick = pref('scene', 'auto');
+    var pick = pref('scene', 'rotate');
     if (SCENES[pick]) return pick;
+    if (pick === 'rotate') return SCENE_IDS[Math.floor(d.getTime() / ROTATE_MS) % SCENE_IDS.length];
     var h = d.getHours() + d.getMinutes() / 60;
     return h >= 5 && h < 9 ? 'dawn' : h >= 9 && h < 16.5 ? 'golden' : h >= 16.5 && h < 18.5 ? 'fog' : 'night';
   }
@@ -199,7 +204,8 @@
     shownScene = s;
     var root = document.documentElement.style, g = 'img/scene-' + s + '-glass.jpg';
     $('homeBg').src = 'img/scene-' + s + '.jpg';
-    $('homeFg').src = 'img/scene-' + s + '-fg.webp';
+    var fg = $('homeFg');
+    if (SCENES[s].fg) { fg.src = 'img/scene-' + s + '-fg.webp'; fg.style.display = ''; } else { fg.style.display = 'none'; fg.removeAttribute('src'); }
     root.setProperty('--home-glass', 'url(' + g + ')');
     root.setProperty('--home-frost', 'url(img/scene-' + s + '-frost.jpg)');
     Array.prototype.forEach.call(document.querySelectorAll('img.homeglass'), function (im) { im.src = g; });
@@ -216,6 +222,11 @@
     Array.prototype.forEach.call(document.querySelectorAll('img.f1glass'), function (im) { im.src = g; });
   }
   applyScene();
+  // Prime Video is built into Fire OS (cannot be uninstalled): hidden from the dock, also when the
+  // hidden-apps list was customised before this change.
+  if (P['apps.hide'] && P['apps.hide'].indexOf('com.amazon.firebat') < 0 && !P['hide.prime']) {
+    setPref('apps.hide', P['apps.hide'] + ',com.amazon.firebat'); setPref('hide.prime', '1');
+  }
 
   // ---- clock tick ----------------------------------------------------------------------------
   function tick() {
@@ -940,8 +951,17 @@
   var F = { g: 0, area: 'row', idx: 0, items: [], tx: 0, loadSeq: 0, cat: 'anime' };
   S.foryou = F;
   // Anime / Shows / Movies along the top; the wheel on the left lists what each one offers.
-  var CATS = ['continue', 'anime', 'shows', 'movies'];
-  function catGenres(c) { return c === 'continue' ? ['Watching'] : c === 'anime' ? Object.keys(Data.ANIME) : ['Popular', 'Featured'].concat(Data.GENRES); }
+  var CATS = ['continue', 'anilist', 'anime', 'shows', 'movies'];
+  var ANILIST_VIEWS = ['Due to watch', 'Upcoming', 'Planning', 'All'];
+  function catGenres(c) { return c === 'continue' ? ['Watching'] : c === 'anilist' ? ANILIST_VIEWS : c === 'anime' ? Object.keys(Data.ANIME) : ['Popular', 'Featured'].concat(Data.GENRES); }
+  function anilistItems(view) {
+    return Data.anilistList(pref('anilist.user', '')).then(function (all) {
+      if (view === 'Due to watch') return all.filter(function (m) { return m.due > 0; });
+      if (view === 'Upcoming') return all.filter(function (m) { return m.nextAt && !m.due; });
+      if (view === 'Planning') return all.filter(function (m) { return m.listStatus === 'PLANNING'; });
+      return all;
+    });
+  }
   var catDefault = pref('stremio.key', '') ? 'continue' : 'anime';
   F.cat = CATS.indexOf(pref('foryou.cat', catDefault)) >= 0 ? pref('foryou.cat', catDefault) : catDefault;
   // Continue watching from the linked Stremio library, shaped like catalog items.
@@ -1014,19 +1034,23 @@
     var seq = ++F.loadSeq, g = F.genres[F.g], type = F.cat === 'movies' ? 'movie' : 'series';
     F.loading = true;
     $('fyMsg').textContent = 'Loading from Stremio…';
-    var p = F.cat === 'continue' ? continueItems() : F.cat === 'anime' ? Data.anime(g)
+    var p = F.cat === 'continue' ? continueItems() : F.cat === 'anilist' ? anilistItems(g) : F.cat === 'anime' ? Data.anime(g)
       : Data.picks(type, g === 'Popular' || g === 'Featured' ? '' : g, g === 'Featured' ? 'imdbRating' : 'top');
     p.then(function (items) {
       if (seq !== F.loadSeq) return;
       F.loading = false;
       F.items = items; F.idx = 0; F.tx = 0;
-      $('fyMsg').textContent = items.length ? '' : F.cat === 'continue' ? 'Nothing to continue in your Stremio library yet.' : 'Nothing in ' + g + ' right now.';
+      $('fyMsg').textContent = items.length ? '' : F.cat === 'continue' ? 'Nothing to continue in your Stremio library yet.'
+        : F.cat === 'anilist' ? (g === 'Due to watch' ? 'All caught up: nothing due on your AniList.' : 'Nothing in ' + g + ' on your AniList.') : 'Nothing in ' + g + ' right now.';
       $('fyRow').innerHTML = items.map(function (m) { return '<img src="' + esc(m.poster) + '" alt="">'; }).join('');
       F.paint();
     }).catch(function (e) {
       if (seq !== F.loadSeq) return;
       F.loading = false;
-      if (e && e.message === 'unlinked') {
+      if (e && e.message === 'no-anilist') {
+        F.items = []; F.idx = 0; $('fyRow').innerHTML = ''; F.paint();
+        $('fyMsg').textContent = 'Add your AniList user name: phone page, Setup tab.';
+      } else if (e && e.message === 'unlinked') {
         F.items = []; F.idx = 0; $('fyRow').innerHTML = ''; F.paint();
         $('fyMsg').textContent = 'Link Stremio to see what you were watching: Home settings > Accounts > Stremio.';
       } else $('fyMsg').textContent = 'Could not reach Stremio\'s catalog.';
@@ -1047,8 +1071,13 @@
     $('fyWant').classList.toggle('focus', F.area === 'want');
     $('fyPlay').classList.toggle('focus', F.area === 'play');
     if (!m) { $('fyTitle').textContent = ''; $('fyMeta').textContent = ''; $('fyPoster').style.opacity = 0; return; }
-    var kind = F.cat === 'continue' ? 'CONTINUE' : F.cat === 'anime' ? 'ANIME' : m.type === 'movie' ? 'FILM' : 'SERIES', fk = $('fyKind');
-    if (fk.getAttribute('data-k') !== kind) { fk.setAttribute('data-k', kind); fk.innerHTML = kind + ' <span>· STREMIO</span>'; }
+    var kind = F.cat === 'continue' ? 'CONTINUE' : F.cat === 'anilist' ? 'ANILIST' : F.cat === 'anime' ? 'ANIME' : m.type === 'movie' ? 'FILM' : 'SERIES', fk = $('fyKind');
+    var where = F.cat !== 'anilist' ? 'STREMIO' : m.stremio ? 'ON STREMIO' : m.stremio === null ? 'SEARCH IN STREMIO' : 'CHECKING STREMIO';
+    if (fk.getAttribute('data-k') !== kind + where) { fk.setAttribute('data-k', kind + where); fk.innerHTML = kind + ' <span>\u00b7 ' + where + '</span>'; }
+    if (F.cat === 'anilist' && m.stremio === undefined && !m.checking) {
+      m.checking = true;
+      Data.onStremio(m.name).then(function (hit) { m.stremio = hit; m.checking = false; if (F.items[F.idx] === m) F.paint(); });
+    }
     setText($('fyTitle'), m.name || '');
     var g = (m.genres && m.genres[0]) || '';
     setText($('fyMeta'), m.meta || [m.year, g, m.rating ? 'IMDb ' + m.rating : ''].filter(Boolean).join(' · '));
@@ -1126,7 +1155,13 @@
       else if (k === 'left') { F.area = 'cats'; F.paint(); }
       else if (k === 'ok') go('jarvis');
     }
-    function open() { var m = F.items[F.idx]; if (m) { if (m.videoId) GH.openStremioVideo(m.type, m.id, m.videoId); else GH.openStremio(m.type, m.id); } }
+    function open() {
+      var m = F.items[F.idx];
+      if (!m) return;
+      if (m.videoId) GH.openStremioVideo(m.type, m.id, m.videoId);
+      else if (F.cat === 'anilist') { if (m.stremio) GH.openStremio(m.stremio.type, m.stremio.id); else GH.searchIn('stremio', m.name); }
+      else GH.openStremio(m.type, m.id);
+    }
   };
 
   // ---- Home settings ----------------------------------------------------------------------------
@@ -1140,13 +1175,13 @@
     { name: 'Appearance', icon: I.image, rows: function () {
       var c = cyc('clock', ['12', '24'], ['12-hour', '24-hour'], '12');
       var ic = cyc('icons', ['nothing', 'colour'], ['Nothing style', 'Original colours'], 'nothing');
-      var sc = cyc('scene', ['auto', 'night', 'dawn', 'golden', 'fog'], ['By time of day', 'Night', 'Dawn', 'Golden', 'Fog'], 'auto');
+      var sc = cyc('scene', ['rotate', 'auto'].concat(SCENE_IDS), ['All, every 30 min', 'By time of day'].concat(SCENE_IDS.map(function (k) { return SCENES[k].label; })), 'rotate');
       return [
         { lbl: 'LOOK' }, { b: 'Clean', s: 'Glass clock behind the mountain, app dock, Jarvis at the end', val: 'On' },
         { b: 'Clock', s: 'How the time is written', val: c.val, a: c.a },
         { b: 'App icons', s: 'Nothing style: white icons on dark glass. Or each app\'s own colours', val: ic.val, a: function () { ic.a(); H.build(); } },
         { lbl: 'SCENES' },
-        { img: 'img/scene-' + sceneNow(new Date()) + '.jpg', b: 'Home scene', s: 'Changes with the time of day: dawn, golden day, fog at dusk, night', val: sc.val, a: function () { sc.a(); shownScene = ''; applyScene(); } },
+        { img: 'img/scene-' + sceneNow(new Date()) + '.jpg', b: 'Home scene', s: SCENE_IDS.length + ' scenes. Move through all of them, follow the time of day, or keep one', val: sc.val, a: function () { sc.a(); shownScene = ''; applyScene(); } },
         { img: 'img/f1-suzuka.jpg', b: 'Screensaver', s: 'A new F1 photo each time it starts, and every 10 minutes', val: F1.length + ' photos' }
       ];
     } },
@@ -1180,7 +1215,7 @@
         { b: 'Weather place', s: 'Found from your internet connection unless set', val: pref('weather.lat', '') ? 'Custom' : 'Automatic' }];
     } },
     { name: 'Apps', icon: I.grid, rows: function () {
-      var hide = pref('apps.hide', 'com.amazon.bueller.music,com.amazon.minitv.android.app,com.amazon.firetv.troubleshooting,me.efesser.flauncher,com.amazon.spiderpork,tv.dumbtv.home,com.amazon.gamehub,com.android.providers.downloads.ui,com.amazon.ftv.profilepicker,com.amazon.avod,com.amazon.ftv.screensaver,com.amazon.ssm,com.amazon.vizzini.ftvcds,com.amazon.cloud9,com.amazon.tahoe').split(',');
+      var hide = pref('apps.hide', 'com.amazon.bueller.music,com.amazon.minitv.android.app,com.amazon.firetv.troubleshooting,me.efesser.flauncher,com.amazon.spiderpork,tv.dumbtv.home,com.amazon.gamehub,com.android.providers.downloads.ui,com.amazon.ftv.profilepicker,com.amazon.avod,com.amazon.ftv.screensaver,com.amazon.ssm,com.amazon.vizzini.ftvcds,com.amazon.cloud9,com.amazon.tahoe,com.amazon.firebat').split(',');
       var all = live.apps.slice();
       hide.forEach(function (h) { if (h && !all.some(function (a) { return a.id === h; })) all.push({ id: h, label: h }); });
       return [{ lbl: 'ON THE DOCK' }].concat(all.slice(0, 12).map(function (app) {
