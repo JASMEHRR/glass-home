@@ -18,10 +18,12 @@ public final class RemoteReceiver extends BroadcastReceiver {
         String k = i.getStringExtra(KEY), t = i.getStringExtra(TEXT);
         MainActivity m = MainActivity.current;
         if (m != null && m.resumed) {
+            android.util.Log.i("GlassHome", "phone remote " + k + " on Glass Home");
             if ("home".equals(k)) m.js("window.UI&&UI.home()");
             else if (k != null && k.matches("up|down|left|right|ok|back|menu")) m.js("window.UI&&UI.key(" + JSONObject.quote(k) + ")");
             return;
         }
-        Guard.remote(k, t);
+        boolean done = Guard.remote(k, t);
+        android.util.Log.i("GlassHome", "phone remote " + k + " in another app: " + (done ? "done" : "nothing to act on"));
     }
 }

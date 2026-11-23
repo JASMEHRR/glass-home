@@ -38,6 +38,8 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
 .pad .ok { left: 80px; top: 80px; width: 100px; height: 100px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); font-size: 17px; }
 .row { display: flex; gap: 8px; margin-top: 12px; }
 .row button { flex: 1; padding: 14px 0; border-radius: 16px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); }
+.mic { display: block; margin: 0 auto 14px; width: 92px; height: 92px; border-radius: 50%; border: 1px solid rgba(103,232,249,.5); background: radial-gradient(circle, rgba(103,232,249,.25), rgba(103,232,249,.05)); color: #fff; font: 700 13px system-ui, sans-serif; letter-spacing: .1em; }
+.mic.on { background: radial-gradient(circle, rgba(103,232,249,.85), rgba(56,189,248,.35)); color: #02040a; box-shadow: 0 0 0 10px rgba(103,232,249,.15); }
 .state { text-align: center; font-size: 13px; color: var(--muted); margin-top: 8px; min-height: 18px; }
 </style>
 </head>
@@ -56,6 +58,7 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
 
   <div id="remote">
     <div class="card">
+      <button class="mic" id="mic2">TALK</button>
       <div class="pad" id="pad">
         <button class="u" data-k="up" aria-label="Up">&#9650;</button>
         <button class="l" data-k="left" aria-label="Left">&#9664;</button>
@@ -65,7 +68,6 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
       </div>
       <div class="row"><button data-k="back">Back</button><button data-k="home">Home</button><button data-k="menu">Menu</button></div>
       <div class="row"><button data-k="rew">&#9194;</button><button data-k="play">&#9199;</button><button data-k="ffwd">&#9193;</button></div>
-      <div class="row"><button data-k="voldown">Vol &minus;</button><button data-k="mute">Mute</button><button data-k="volup">Vol +</button></div>
       <div class="state" id="rstate"></div>
     </div>
     <div class="card">
@@ -76,7 +78,8 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
 
   <div id="talk" class="hide">
     <div class="card">
-      <textarea id="text" placeholder="Tap here, then the mic on your keyboard, and talk to Jarvis"></textarea>
+      <button class="mic" id="mic1">TALK</button>
+      <textarea id="text" placeholder="Tap TALK and speak, or type here"></textarea>
       <button class="send" id="sendBtn">Send to Jarvis</button>
       <div class="hint">Your keyboard's mic turns speech into text. Pause, play, next and previous work even while a video is playing.</div>
     </div>
@@ -146,6 +149,25 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
       $('set').classList.toggle('hide', b.getAttribute('data-t') !== 'set');
     };
   });
+
+  // ---- talk: the phone's own speech recognition (needs the https address) ----
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function listen(btn) {
+    if (!SR || !window.isSecureContext) {
+      showState('To talk, open https://' + location.hostname + ':8767 (scan the QR on the TV again).');
+      $('text').placeholder = 'Talking needs the https address: scan the QR on the TV again';
+      return;
+    }
+    var r = new SR(), heard = '';
+    r.lang = 'en-IN'; r.interimResults = true; r.maxAlternatives = 1;
+    r.onresult = function (e) { heard = Array.prototype.map.call(e.results, function (x) { return x[0].transcript; }).join(''); $('text').value = heard; };
+    r.onerror = function () { btn.classList.remove('on'); };
+    r.onend = function () { btn.classList.remove('on'); if (heard.trim()) say(heard); };
+    btn.classList.add('on');
+    if (navigator.vibrate) navigator.vibrate(20);
+    r.start();
+  }
+  ['mic1', 'mic2'].forEach(function (id) { $(id).onclick = function () { listen($(id)); }; });
 
   // ---- remote ----
   var STATES = { ready: 'Remote ready', home: 'Make Glass Home the TV\'s Home screen first: the remote works through it.' };

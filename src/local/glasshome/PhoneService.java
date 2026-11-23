@@ -43,13 +43,16 @@ import java.util.concurrent.Executors;
  */
 public final class PhoneService extends Service {
     static final int PORT = 8766;
+    /** The same page over https, so the phone's browser lets the page use the microphone. */
+    static final int TLS_PORT = 8767;
     static final String LOG_FILE = "jarvis-log.json";
     static final String HEARD = "heard";
     private static final String CHANNEL = "phone";
     private static final int MAX_FAILS = 20;
 
-    private final ExecutorService pool = Executors.newFixedThreadPool(3);
+    private final ExecutorService pool = Executors.newFixedThreadPool(4);
     private ServerSocket server;
+    private ServerSocket tlsServer;
     private Thread thread;
     private int fails;
     private int lockouts;
@@ -146,6 +149,7 @@ public final class PhoneService extends Service {
         startForeground(1, n);
         thread = new Thread(this::serve, "phone-server");
         thread.start();
+        new Thread(this::serveTls, "phone-tls").start();
     }
 
     @Override
@@ -162,6 +166,7 @@ public final class PhoneService extends Service {
     public void onDestroy() {
         try {
             if (server != null) server.close();
+            if (tlsServer != null) tlsServer.close();
         } catch (IOException ignored) {
             // closing anyway
         }
@@ -181,6 +186,28 @@ public final class PhoneService extends Service {
             }
         } catch (IOException ignored) {
             // port busy or closed: the next start tries again
+        }
+    }
+
+    private void serveTls() {
+        char[] pw = "glasshome".toCharArray();
+        try (InputStream in = getAssets().open("tls/phone.p12")) {
+            java.security.KeyStore ks = java.security.KeyStore.getInstance("PKCS12");
+            ks.load(in, pw);
+            javax.net.ssl.KeyManagerFactory kmf = javax.net.ssl.KeyManagerFactory.getInstance(javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
+            kmf.init(ks, pw);
+            javax.net.ssl.SSLContext ctx = javax.net.ssl.SSLContext.getInstance("TLS");
+            ctx.init(kmf.getKeyManagers(), null, null);
+            tlsServer = ctx.getServerSocketFactory().createServerSocket();
+            tlsServer.setReuseAddress(true);
+            tlsServer.bind(new InetSocketAddress(TLS_PORT));
+            while (!tlsServer.isClosed()) {
+                Socket s = tlsServer.accept();
+                s.setSoTimeout(8000);
+                pool.execute(() -> handle(s));
+            }
+        } catch (IOException | java.security.GeneralSecurityException e) {
+            android.util.Log.w("GlassHome", "phone https off: " + e);
         }
     }
 

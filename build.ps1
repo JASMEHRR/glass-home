@@ -93,6 +93,15 @@ Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $zip = [System.IO.Compression.ZipFile]::Open($Unsigned, [System.IO.Compression.ZipArchiveMode]::Update)
 try {
     [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $Build 'dex\classes.dex'), 'classes.dex') | Out-Null
+    # The phone page's https certificate (phones only allow the microphone on https). Made once,
+    # kept in keystore\ (not in git). Legacy PKCS12 so Android 9 can read it.
+    $Tls = Join-Path $Root 'keystore\phone-tls.p12'
+    if (-not (Test-Path -LiteralPath $Tls)) {
+        New-Item -ItemType Directory -Force -Path (Join-Path $Root 'keystore') -ErrorAction Stop | Out-Null
+        Run $Keytool @('-J-Dkeystore.pkcs12.legacy', '-genkeypair', '-keystore', $Tls, '-storetype', 'PKCS12', '-alias', 'phone',
+            '-keyalg', 'RSA', '-keysize', '2048', '-validity', '3650', '-dname', 'CN=Glass Home', '-storepass', 'glasshome', '-keypass', 'glasshome')
+    }
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $Tls, 'assets/tls/phone.p12', [System.IO.Compression.CompressionLevel]::NoCompression) | Out-Null
     # Assets go in here, not through aapt2 -A: on Windows aapt2 names them like assets/ui\index.html,
     # which Android cannot open, so the TV showed a black "Webpage not available" screen.
     $AssetRoot = (Get-Item -LiteralPath (Join-Path $Root 'assets') -ErrorAction Stop).FullName.TrimEnd('\')

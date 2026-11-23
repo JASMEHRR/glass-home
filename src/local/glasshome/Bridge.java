@@ -432,7 +432,7 @@ final class Bridge {
     public String phone() {
         JSONObject o = new JSONObject();
         try {
-            o.put("url", "http://" + PhoneService.lanAddress() + ":" + PhoneService.PORT)
+            o.put("url", "https://" + PhoneService.lanAddress() + ":" + PhoneService.TLS_PORT)
                     .put("pin", PhoneService.pin(a));
         } catch (JSONException ignored) {
             // plain values

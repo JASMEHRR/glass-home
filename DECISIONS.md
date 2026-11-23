@@ -30,3 +30,5 @@
 - 2026-11-23: Home scene follows the time (Dawn 5-9 AM, Golden 9 AM-4:30 PM, Fog 4:30-6:30 PM, Night after); pick one in Home settings > Appearance. Scenes from tvOS Launcher (Apache-2.0).
 - 2026-11-23: Screensaver rotates 4 F1 photos by Takayuki Suzuki (CC BY-SA 2.0, Wikimedia Commons, credited on screen): next one each start and every 10 minutes. APK is now 3.4 MB because of the photos.
 - 2026-11-23: Command Center drops in from the top (iOS-like) instead of popping out of its button.
+- 2026-11-23: Phone page also served over https on port 8767 with a certificate made at build time (keystore/phone-tls.p12, not in git), so the phone's browser allows the mic: TALK button uses the phone's speech recognition. The QR now points to the https address; the phone shows a one-time certificate warning.
+- 2026-11-23: Volume buttons removed from the phone remote: the Fire remote sends volume to the TV by infrared, the stick itself cannot change TV volume.

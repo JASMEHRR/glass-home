@@ -696,7 +696,7 @@
     $('jWords').innerHTML = '';
     var link = {};
     try { link = JSON.parse(GH.phone()); } catch (e) { link = {}; }
-    $('jUrl').textContent = (link.url || '').replace('http://', '');
+    $('jUrl').textContent = (link.url || '').replace(/^https?:\/\//, '');
     $('jPin').textContent = link.pin || '';
     var qr = link.url && GH.qr ? GH.qr(link.url + '/#pin=' + link.pin) : '';
     $('jQr').style.display = qr ? '' : 'none';
@@ -1060,7 +1060,7 @@
       var v = cyc('voice', ['on', 'off'], ['On', 'Off'], 'on'), link = {};
       try { link = JSON.parse(GH.phone()); } catch (e) { link = {}; }
       return [{ lbl: 'VOICE' }, { b: 'Spoken replies', s: 'Jarvis answers out loud', val: v.val, a: v.a },
-        { lbl: 'PHONE' }, { b: 'Talk from your phone', s: (link.url || '').replace('http://', '') + '  ·  PIN ' + (link.pin || ''), val: 'Open', a: function () { go('jarvis'); } },
+        { lbl: 'PHONE' }, { b: 'Talk from your phone', s: (link.url || '').replace(/^https?:\/\//, '') + '  ·  PIN ' + (link.pin || ''), val: 'Open', a: function () { go('jarvis'); } },
         { lbl: 'BRAIN' }, { b: 'Ascend Jarvis', s: pref('ascend.url', '') ? 'Connected for questions and Muse tasks' : 'Set the Ascend address and TV key on the phone page', val: pref('ascend.url', '') ? 'On' : 'Not set' }];
     } },
     { name: 'Accounts', icon: I.user, rows: function () {
