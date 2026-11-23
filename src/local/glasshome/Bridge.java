@@ -367,6 +367,31 @@ final class Bridge {
         return o.toString();
     }
 
+    /**
+     * Amazon apps that sit in memory doing nothing for this TV (Fire OS will not let its own home
+     * screen be switched off, but these can be stopped while idle; each comes back when opened).
+     * Casting, Alexa and anything playing or on screen are never touched.
+     */
+    static final String[] AMAZON_IDLE = {"com.amazon.venezia", "com.amazon.adep", "com.amazon.tv.settings.v2",
+        "com.amazon.ftv.screensaver", "com.amazon.ssm", "com.amazon.gamehub", "com.amazon.tahoe", "com.amazon.cloud9",
+        "com.amazon.vizzini.ftvcds", "com.amazon.avod"};
+    private long trimmedAt;
+
+    /** Quietly stops idle background apps (Amazon's idle ones too); at most every 5 minutes. */
+    @JavascriptInterface
+    public void trim() {
+        long now = SystemClock.elapsedRealtime();
+        if (now - trimmedAt < 5 * 60_000L && trimmedAt != 0) return;
+        trimmedAt = now;
+        io.execute(() -> {
+            ActivityManager am = (ActivityManager) a.getSystemService(Context.ACTIVITY_SERVICE);
+            for (String pkg : AMAZON_IDLE) am.killBackgroundProcesses(pkg);
+            for (ApplicationInfo ai : a.getPackageManager().getInstalledApplications(0)) {
+                if ((ai.flags & ApplicationInfo.FLAG_SYSTEM) == 0 && !ai.packageName.equals(a.getPackageName())) am.killBackgroundProcesses(ai.packageName);
+            }
+        });
+    }
+
     /** Stops background apps and reports how much memory came back. */
     @JavascriptInterface
     public void freeMemory(String id) {
@@ -380,6 +405,7 @@ final class Bridge {
                 if ((ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0) continue;
                 am.killBackgroundProcesses(ai.packageName);
             }
+            for (String pkg : AMAZON_IDLE) am.killBackgroundProcesses(pkg);
             SystemClock.sleep(800);
             ActivityManager.MemoryInfo after = new ActivityManager.MemoryInfo();
             am.getMemoryInfo(after);

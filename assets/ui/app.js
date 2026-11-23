@@ -422,7 +422,7 @@
     x.lineWidth = 2; x.strokeStyle = rim; x.stroke();
   }
   H.first = function () { H.area = 'dock'; H.idx = 1; H.paint(); };
-  H.enter = function () { if (H.orb) H.orb.start(); frostAll(); H.paint(); };
+  H.enter = function () { if (H.orb) H.orb.start(); frostAll(); H.paint(); if (GH.trim) setTimeout(function () { GH.trim(); }, 1500); };
   H.resume = H.enter;
   H.leave = function () { if (H.orb) H.orb.stop(); };
   H.key = function (k) {
