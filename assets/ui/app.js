@@ -696,8 +696,8 @@
     $('jWords').innerHTML = '';
     var link = {};
     try { link = JSON.parse(GH.phone()); } catch (e) { link = {}; }
-    $('jUrl').textContent = (link.url || '').replace(/^https?:\/\//, '');
-    $('jPin').textContent = link.pin || '';
+    // the line is rebuilt each time (pairing below replaces its contents)
+    $('jLinkText').innerHTML = 'Remote and Jarvis on your phone: scan, or open<br><b>' + esc((link.url || '').replace(/^https?:\/\//, '')) + '</b> · PIN <b>' + esc(link.pin || '') + '</b>';
     var qr = link.url && GH.qr ? GH.qr(link.url + '/#pin=' + link.pin) : '';
     // Paired with Ascend (or pairing): the one phone page on Ascend replaces the TV's own address.
     var tvPage = pref('ascend.url', '').replace(/\/+$/, '') + '/tv/';
