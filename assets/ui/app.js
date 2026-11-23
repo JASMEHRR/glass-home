@@ -699,6 +699,14 @@
     $('jUrl').textContent = (link.url || '').replace(/^https?:\/\//, '');
     $('jPin').textContent = link.pin || '';
     var qr = link.url && GH.qr ? GH.qr(link.url + '/#pin=' + link.pin) : '';
+    // Paired with Ascend (or pairing): the one phone page on Ascend replaces the TV's own address.
+    var tvPage = pref('ascend.url', '').replace(/\/+$/, '') + '/tv/';
+    if (window.Relay && (Relay.state === 'paired' || Relay.state === 'pair') && GH.qr) {
+      qr = GH.qr(tvPage);
+      $('jLinkText').innerHTML = Relay.state === 'pair'
+        ? 'Pair your phone: scan, or open<br><b>' + esc(tvPage.replace(/^https?:\/\//, '')) + '</b> and type <b style="letter-spacing:.2em">' + esc(Relay.code) + '</b>'
+        : 'Remote and Jarvis on your phone: scan, or open<br><b>' + esc(tvPage.replace(/^https?:\/\//, '')) + '</b> · add it to your home screen';
+    }
     $('jQr').style.display = qr ? '' : 'none';
     if (qr) $('jQr').src = qr;
     $('jLink').style.opacity = 1;
@@ -716,6 +724,7 @@
   function logLine(who, text) {
     J.log.push({ who: who, text: text, at: Date.now() });
     J.log = J.log.slice(-20);
+    if (window.Relay) Relay.push({ log: J.log.slice(-14) });
     try { GH.jarvisLog(JSON.stringify(J.log)); } catch (e) { /* phone log is optional */ }
   }
   // Shows the reply on the TV and says it through the TV speakers (the shorter `spoken` line when
@@ -796,6 +805,43 @@
     });
   }
   window.UI = window.UI || {};
+
+  // ---- the phone page on Ascend (relay.js) ----------------------------------------------------------
+  function relayPushAll() {
+    if (!window.Relay) return;
+    Relay.push({ label: 'Glass Home', screen: top(), log: J.log.slice(-14), anilist: pref('anilist.user', ''), stremio: !!pref('stremio.key', ''),
+      apps: (live.apps || []).map(function (a) { return { id: a.id, label: a.label }; }) });
+  }
+  function relayCmd(c) {
+    resetIdle();
+    if (c.t === 'key') {
+      if (c.k === 'play') GH.media('play_pause');
+      else if (c.k === 'rew') GH.media('rewind');
+      else if (c.k === 'ffwd') GH.media('fast_forward');
+      else if (/^(up|down|left|right|ok|back|home|menu|del)$/.test(c.k)) GH.remote(c.k, '');
+    } else if (c.t === 'type') GH.remote('type', String(c.text || '').slice(0, 200));
+    else if (c.t === 'launch') {
+      var app = (live.apps || []).filter(function (a) { return a.id === c.id; })[0];
+      if (app) GH.launch(app.id);
+    } else if (c.t === 'say' && c.text) {
+      GH.showMe();
+      setTimeout(function () { window.UI.heard(String(c.text).slice(0, 500)); }, 400);
+    } else if (c.t === 'setting' && c.key === 'anilist.user' && /^[A-Za-z0-9_-]{0,40}$/.test(String(c.value || ''))) {
+      setPref('anilist.user', String(c.value || ''));
+      relayPushAll();
+    } else if (c.t === 'screen' && c.name === 'stremio-link') {
+      GH.showMe();
+      setTimeout(function () { go('expanded', 'stremio'); }, 400);
+    }
+  }
+  function relayStart() {
+    if (!window.Relay) return;
+    loadPrefs();
+    Relay.start({ url: pref('ascend.url', ''), key: pref('ascend.key', ''), onCmd: relayCmd,
+      onChange: function () { if (top() === 'jarvis') J.enter(); relayPushAll(); } });
+  }
+  setTimeout(relayStart, 2500);
+  setInterval(function () { if (window.Relay && Relay.state === 'paired') relayPushAll(); }, 60000);
 
   // ---- Command Center ---------------------------------------------------------------------------
   var C = { idx: 0, items: [], orb: null, timerSteps: [0, 15, 30, 60, 90] };

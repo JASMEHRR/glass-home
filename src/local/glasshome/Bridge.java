@@ -245,6 +245,19 @@ final class Bridge {
         return launch(STREMIO);
     }
 
+    /** A phone-remote press from the Ascend page: to Glass Home's page or, over another app, the accessibility service. */
+    @JavascriptInterface
+    public void remote(String k, String text) {
+        a.sendBroadcast(new Intent(a, RemoteReceiver.class).putExtra(RemoteReceiver.KEY, k).putExtra(RemoteReceiver.TEXT, text == null ? "" : text));
+    }
+
+    /** Brings Glass Home to the front (Jarvis answers from the phone show and speak on the TV). */
+    @JavascriptInterface
+    public void showMe() {
+        if (a.resumed) return;
+        start(new Intent(a, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+    }
+
     /** Jarvis's "play X on Stremio" / "search X on YouTube": opens that app's search for X. */
     @JavascriptInterface
     public boolean searchIn(String app, String query) {

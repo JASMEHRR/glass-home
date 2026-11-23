@@ -58,7 +58,7 @@
   <div class="orbbig"><canvas id="bigOrb"></canvas></div>
   <div class="state" id="jState">LISTENING</div>
   <div class="words" id="jWords"></div>
-  <div class="link" id="jLink"><img class="qr" id="jQr" alt=""><div>Remote and Jarvis on your phone: scan, or open<br><b id="jUrl"></b> · PIN <b id="jPin"></b></div></div>
+  <div class="link" id="jLink"><img class="qr" id="jQr" alt=""><div id="jLinkText">Remote and Jarvis on your phone: scan, or open<br><b id="jUrl"></b> · PIN <b id="jPin"></b></div></div>
 </section>
 
 <!-- Command Center -->
@@ -105,6 +105,10 @@
 <script src="orb.js"></script>
 <script src="data.js"></script>
 <script src="brain.js"></script>
+<script src="vendor/firebase-app-compat.js"></script>
+<script src="vendor/firebase-auth-compat.js"></script>
+<script src="vendor/firebase-firestore-compat.js"></script>
+<script src="relay.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
