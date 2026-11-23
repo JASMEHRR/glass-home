@@ -124,8 +124,15 @@ final class Bridge {
     public String apps() {
         String cached = apps;
         if (cached != null) return cached;
+        apps = appList(a);
+        return apps;
+    }
+
+    /** The dock's apps as JSON [{id,label}] in dock order; also used by the phone page. */
+    static String appList(Context a) {
         PackageManager pm = a.getPackageManager();
-        Set<String> hide = new HashSet<>(Arrays.asList(store().get("apps.hide", DEFAULT_HIDE).split(",")));
+        Prefs store = Prefs.get(a);
+        Set<String> hide = new HashSet<>(Arrays.asList(store.get("apps.hide", DEFAULT_HIDE).split(",")));
         hide.add(a.getPackageName());
         hide.add(Guard.AMAZON);
         Map<String, String> found = new LinkedHashMap<>();
@@ -137,7 +144,7 @@ final class Bridge {
                 found.put(pkg, String.valueOf(r.loadLabel(pm)));
             }
         }
-        List<String> order = new ArrayList<>(Arrays.asList(store().get("apps.order", DEFAULT_ORDER).split(",")));
+        List<String> order = new ArrayList<>(Arrays.asList(store.get("apps.order", DEFAULT_ORDER).split(",")));
         List<String> keys = new ArrayList<>(found.keySet());
         keys.sort((x, y) -> {
             int ix = order.indexOf(x), iy = order.indexOf(y);
@@ -150,8 +157,7 @@ final class Bridge {
         } catch (JSONException ignored) {
             // values are plain strings
         }
-        apps = out.toString();
-        return apps;
+        return out.toString();
     }
 
     /** The app's icon as a 216px PNG data URL (its TV banner, cropped, when the icon is tiny). */
@@ -200,15 +206,22 @@ final class Bridge {
 
     @JavascriptInterface
     public boolean launch(String pkg) {
+        Intent i = launchIntent(a, pkg);
+        if (i == null) return false;
+        if (Guard.AMAZON.equals(pkg)) Guard.pause();
+        return start(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+    }
+
+    /** How to open an app (the Appstore opens on its store front). Null if it cannot be opened. */
+    static Intent launchIntent(Context a, String pkg) {
         PackageManager pm = a.getPackageManager();
         Intent i = pm.getLeanbackLaunchIntentForPackage(pkg);
         if (i == null) i = pm.getLaunchIntentForPackage(pkg);
-        if (i == null) return false;
+        if (i == null) return null;
         // The Appstore's own launch screen is just "Your Apps & Games"; its store front (search,
         // featured, categories) is ADEHomeActivity.
         if (APPSTORE.equals(pkg)) i = new Intent(Intent.ACTION_MAIN).setClassName(APPSTORE, APPSTORE + ".ade.ADEHomeActivity");
-        if (Guard.AMAZON.equals(pkg)) Guard.pause();
-        return start(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+        return i;
     }
 
     private boolean start(Intent i) {

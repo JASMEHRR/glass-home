@@ -40,6 +40,9 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
 .row button { flex: 1; padding: 14px 0; border-radius: 16px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); }
 .mic { display: block; margin: 0 auto 14px; width: 92px; height: 92px; border-radius: 50%; border: 1px solid rgba(103,232,249,.5); background: radial-gradient(circle, rgba(103,232,249,.25), rgba(103,232,249,.05)); color: #fff; font: 700 13px system-ui, sans-serif; letter-spacing: .1em; }
 .mic.on { background: radial-gradient(circle, rgba(103,232,249,.85), rgba(56,189,248,.35)); color: #02040a; box-shadow: 0 0 0 10px rgba(103,232,249,.15); }
+.apps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.apps button { padding: 14px 6px; border-radius: 16px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.07); color: #fff; font: 600 14px system-ui, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apps button:active { background: rgba(103,232,249,.25); }
 .state { text-align: center; font-size: 13px; color: var(--muted); margin-top: 8px; min-height: 18px; }
 </style>
 </head>
@@ -69,6 +72,10 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
       <div class="row"><button data-k="back">Back</button><button data-k="home">Home</button><button data-k="menu">Menu</button></div>
       <div class="row"><button data-k="rew">&#9194;</button><button data-k="play">&#9199;</button><button data-k="ffwd">&#9193;</button></div>
       <div class="state" id="rstate"></div>
+    </div>
+    <div class="card">
+      <label>APPS</label>
+      <div class="apps" id="appGrid"></div>
     </div>
     <div class="card">
       <input id="typeText" autocomplete="off" placeholder="Type into the search box on the TV">
@@ -123,7 +130,7 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
     return fetch(path + '?pin=' + encodeURIComponent(pin), { cache: 'no-store' }).then(function (r) { if (r.status === 403) throw new Error('pin'); return r.json(); });
   }
   function needPin(msg) { $('app').classList.add('hide'); $('gate').classList.remove('hide'); $('pinMsg').textContent = msg || ''; }
-  function ready() { $('gate').classList.add('hide'); $('app').classList.remove('hide'); poll(); loadSettings(); remoteState(); }
+  function ready() { $('gate').classList.add('hide'); $('app').classList.remove('hide'); poll(); loadSettings(); remoteState(); loadApps(); }
 
   $('pinGo').onclick = function () {
     pin = $('pin').value.trim();
@@ -186,6 +193,22 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
     post('/api/type', { text: t }).then(function (r) { showState(r.state); if (r.ok) $('typeText').value = ''; })
       .catch(function () { showState('the TV did not answer'); });
   };
+  function loadApps() {
+    get('/api/apps').then(function (list) {
+      var g = $('appGrid');
+      g.textContent = '';
+      (list || []).forEach(function (a) {
+        var b = document.createElement('button');
+        b.textContent = a.label;
+        b.onclick = function () {
+          if (navigator.vibrate) navigator.vibrate(15);
+          post('/api/launch', { id: a.id }).then(function (r) { showState(r.ok ? 'Opening ' + a.label : 'Could not open ' + a.label); })
+            .catch(function () { showState('Could not open ' + a.label); });
+        };
+        g.appendChild(b);
+      });
+    }).catch(function () { /* shown elsewhere */ });
+  }
   function remoteState() { get('/api/remote').then(function (r) { showState(r.state); }).catch(function () { /* shown elsewhere */ }); }
 
   function poll() {

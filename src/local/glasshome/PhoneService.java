@@ -287,6 +287,25 @@ public final class PhoneService extends Service {
                         .toString().getBytes(StandardCharsets.UTF_8));
                 return;
             }
+            if ("/api/apps".equals(path)) {
+                send(out, 200, "application/json", Bridge.appList(this).getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            if ("/api/launch".equals(path) && "POST".equals(method)) {
+                String id = q.getOrDefault("id", "");
+                Intent li = id.matches("[A-Za-z0-9._]{1,120}") && Bridge.appList(this).contains("\"" + id + "\"") ? Bridge.launchIntent(this, id) : null;
+                boolean ok = false;
+                if (li != null) {
+                    try {
+                        startActivity(li.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+                        ok = true;
+                    } catch (RuntimeException ignored) {
+                        // not openable right now
+                    }
+                }
+                send(out, ok ? 200 : 400, "application/json", ("{\"ok\":" + ok + "}").getBytes(StandardCharsets.UTF_8));
+                return;
+            }
             if ("/api/remote".equals(path)) {
                 send(out, 200, "application/json", new JSONObject().put("state", remoteState())
                         .toString().getBytes(StandardCharsets.UTF_8));
