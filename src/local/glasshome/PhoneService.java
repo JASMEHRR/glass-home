@@ -228,9 +228,41 @@ public final class PhoneService extends Service {
                     }
                 }
             }
-            String body = len > 0 && len <= 8192 ? new String(readN(in, len), StandardCharsets.UTF_8) : "";
             String path = target.split("\\?", 2)[0];
             Map<String, String> q = form(target.contains("?") ? target.split("\\?", 2)[1] : "");
+            // An APK from the phone: streamed to a file (it can be large), then handed to Android's installer.
+            if ("/api/apk".equals(path) && "POST".equals(method)) {
+                if (!pinOk(q.get("pin"))) {
+                    send(out, 403, "application/json", "{\"ok\":false,\"error\":\"pin\"}".getBytes(StandardCharsets.UTF_8));
+                    return;
+                }
+                if (len <= 0 || len > 400 * 1024 * 1024) {
+                    send(out, 400, "application/json", "{\"ok\":false,\"error\":\"size\"}".getBytes(StandardCharsets.UTF_8));
+                    return;
+                }
+                String name = q.getOrDefault("name", "app.apk").replaceAll("[^A-Za-z0-9 ._()-]", "").trim();
+                File apk = new File(getCacheDir(), "incoming.apk");
+                sock.setSoTimeout(60_000);
+                try (java.io.FileOutputStream f = new java.io.FileOutputStream(apk)) {
+                    byte[] buf = new byte[65536];
+                    for (int left = len, n; left > 0 && (n = in.read(buf, 0, Math.min(buf.length, left))) > 0; left -= n) f.write(buf, 0, n);
+                }
+                boolean ok = apk.length() == len;
+                String err = ok ? "" : "upload cut short";
+                if (ok) {
+                    try {
+                        ApkInstaller.install(this, apk, name.isEmpty() ? "app.apk" : name);
+                    } catch (IOException e) {
+                        ok = false;
+                        err = String.valueOf(e.getMessage());
+                        ApkInstaller.note(this, "failed", name, "Not installed: " + err);
+                    }
+                }
+                send(out, ok ? 200 : 500, "application/json", new JSONObject().put("ok", ok).put("error", err)
+                        .toString().getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            String body = len > 0 && len <= 8192 ? new String(readN(in, len), StandardCharsets.UTF_8) : "";
             if (!body.isEmpty()) q.putAll(form(body));
 
             if ("GET".equals(method) && ("/".equals(path) || "/index.html".equals(path))) {
@@ -285,6 +317,19 @@ public final class PhoneService extends Service {
                         .putExtra(RemoteReceiver.TEXT, q.getOrDefault("text", "").trim()));
                 send(out, 200, "application/json", new JSONObject().put("ok", true).put("state", remoteState())
                         .toString().getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            if ("/api/apk/status".equals(path)) {
+                send(out, 200, "application/json", Prefs.get(this).get(ApkInstaller.LAST, "{}").getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            if ("/api/installed".equals(path)) {
+                send(out, 200, "application/json", ApkInstaller.installed(this).getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            if ("/api/uninstall".equals(path) && "POST".equals(method)) {
+                boolean ok = ApkInstaller.uninstall(this, q.getOrDefault("id", ""));
+                send(out, 200, "application/json", ("{\"ok\":" + ok + "}").getBytes(StandardCharsets.UTF_8));
                 return;
             }
             if ("/api/apps".equals(path)) {

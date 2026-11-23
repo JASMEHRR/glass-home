@@ -251,6 +251,23 @@ final class Bridge {
         a.sendBroadcast(new Intent(a, RemoteReceiver.class).putExtra(RemoteReceiver.KEY, k).putExtra(RemoteReceiver.TEXT, text == null ? "" : text));
     }
 
+    /** Apps the user installed, for the phone page's uninstall list: JSON [{id,label}]. */
+    @JavascriptInterface
+    public String installed() {
+        return ApkInstaller.installed(a);
+    }
+
+    @JavascriptInterface
+    public boolean uninstall(String pkg) {
+        return ApkInstaller.uninstall(a, pkg);
+    }
+
+    /** Where the phone can send an APK (the TV's own page, same Wi-Fi), with its PIN. */
+    @JavascriptInterface
+    public String apkPage() {
+        return "https://" + PhoneService.lanAddress() + ":" + PhoneService.TLS_PORT + "/#apk=1&pin=" + PhoneService.pin(a);
+    }
+
     /** Brings Glass Home to the front (Jarvis answers from the phone show and speak on the TV). */
     @JavascriptInterface
     public void showMe() {

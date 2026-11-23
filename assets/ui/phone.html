@@ -77,6 +77,13 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
       <label>APPS</label>
       <div class="apps" id="appGrid"></div>
     </div>
+    <div class="card" id="apkCard">
+      <label>INSTALL AN APK ON THE TV</label>
+      <input type="file" id="apkFile" accept=".apk,application/vnd.android.package-archive">
+      <button class="send" id="apkGo">Send and install</button>
+      <div class="ok" id="apkMsg"></div>
+      <div class="hint">The TV shows Android's "Install?" screen: confirm it with the remote or the arrows here.</div>
+    </div>
     <div class="card">
       <input id="typeText" autocomplete="off" placeholder="Type into the search box on the TV">
       <div class="row"><button id="typeGo">Type on TV</button><button data-k="del">Delete</button></div>
@@ -118,6 +125,7 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
   var $ = function (id) { return document.getElementById(id); };
   var pin = '';
   try { pin = localStorage.getItem('gh.pin') || ''; } catch (e) { pin = ''; }
+  if (/apk=1/.test(location.hash)) setTimeout(function () { var c = document.getElementById('apkCard'); if (c) c.scrollIntoView(); }, 600);
   var m = location.hash.match(/pin=(\d{4})/);
   if (m) { pin = m[1]; try { localStorage.setItem('gh.pin', pin); } catch (e) { /* private mode */ } history.replaceState(null, '', location.pathname); }
 
@@ -209,6 +217,28 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
       });
     }).catch(function () { /* shown elsewhere */ });
   }
+  // ---- APK install ----
+  function apkStatus(tries) {
+    get('/api/apk/status').then(function (s) {
+      if (s && s.message) $('apkMsg').textContent = (s.name ? s.name + ': ' : '') + s.message;
+      if (tries > 0 && (!s || s.state === 'waiting')) setTimeout(function () { apkStatus(tries - 1); }, 2000);
+    }).catch(function () { /* shown elsewhere */ });
+  }
+  $('apkGo').onclick = function () {
+    var f = $('apkFile').files[0];
+    if (!f) { $('apkMsg').textContent = 'Pick an APK first.'; return; }
+    var x = new XMLHttpRequest();
+    x.open('POST', '/api/apk?pin=' + encodeURIComponent(pin) + '&name=' + encodeURIComponent(f.name));
+    x.upload.onprogress = function (e) { if (e.lengthComputable) $('apkMsg').textContent = 'Sending ' + Math.round(e.loaded * 100 / e.total) + '%'; };
+    x.onload = function () {
+      var r = {}; try { r = JSON.parse(x.responseText); } catch (e) { r = {}; }
+      $('apkMsg').textContent = r.ok ? 'Sent. Confirm the install on the TV.' : 'Not installed: ' + (r.error || x.status);
+      if (r.ok) apkStatus(60);
+    };
+    x.onerror = function () { $('apkMsg').textContent = 'The upload failed. Is the phone on the same Wi-Fi as the TV?'; };
+    x.send(f);
+  };
+
   function remoteState() { get('/api/remote').then(function (r) { showState(r.state); }).catch(function () { /* shown elsewhere */ }); }
 
   function poll() {

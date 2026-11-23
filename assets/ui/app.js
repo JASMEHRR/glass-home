@@ -809,8 +809,10 @@
   // ---- the phone page on Ascend (relay.js) ----------------------------------------------------------
   function relayPushAll() {
     if (!window.Relay) return;
+    var installed = [];
+    try { installed = JSON.parse(GH.installed()); } catch (e) { installed = []; }
     Relay.push({ label: 'Glass Home', screen: top(), log: J.log.slice(-14), anilist: pref('anilist.user', ''), stremio: !!pref('stremio.key', ''),
-      apps: (live.apps || []).map(function (a) { return { id: a.id, label: a.label }; }) });
+      apps: (live.apps || []).map(function (a) { return { id: a.id, label: a.label }; }), installed: installed, apkPage: GH.apkPage() });
   }
   function relayCmd(c) {
     resetIdle();
@@ -829,6 +831,9 @@
     } else if (c.t === 'setting' && c.key === 'anilist.user' && /^[A-Za-z0-9_-]{0,40}$/.test(String(c.value || ''))) {
       setPref('anilist.user', String(c.value || ''));
       relayPushAll();
+    } else if (c.t === 'uninstall' && c.id) {
+      GH.uninstall(String(c.id));
+      setTimeout(relayPushAll, 15000); // the list changes once it is confirmed on the TV
     } else if (c.t === 'screen' && c.name === 'stremio-link') {
       GH.showMe();
       setTimeout(function () { go('expanded', 'stremio'); }, 400);
@@ -956,9 +961,33 @@
   }
   F.genres = catGenres(F.cat);
   F.paintCats = function () {
-    var el = $('fyCats');
-    Array.prototype.forEach.call(el.children, function (b) { b.classList.toggle('cur', b.getAttribute('data-c') === F.cat); });
+    var el = $('fyCats'), blob = $('fyBlob'), cur = null;
+    Array.prototype.forEach.call(el.querySelectorAll('b'), function (b) {
+      var on = b.getAttribute('data-c') === F.cat;
+      b.classList.toggle('cur', on);
+      if (on) cur = b;
+    });
     el.classList.toggle('focus', F.area === 'cats');
+    if (!cur) return;
+    var left = cur.offsetLeft, right = el.clientWidth - cur.offsetLeft - cur.offsetWidth;
+    var was = +(blob.getAttribute('data-left') || left), dir = left > was ? 1 : left < was ? -1 : 0;
+    // the edge in front moves first and fast, the one behind follows with a springy overshoot
+    var lead = 'cubic-bezier(.3,1.25,.5,1) 0s', trail = 'cubic-bezier(.4,1.6,.45,1) .07s';
+    blob.style.transition = 'background .25s, box-shadow .25s, left .42s ' + (dir < 0 ? lead : trail) + ', right .42s ' + (dir > 0 ? lead : trail);
+    blob.style.left = left + 'px';
+    blob.style.right = right + 'px';
+    blob.setAttribute('data-left', left);
+  };
+  // Turns the genre wheel by one (down = next) and loads it, with the names sliding in that way.
+  F.turn = function (dir) {
+    var ga = F.genres.length, w = $('fyWheel');
+    if (ga < 2) return;
+    F.g = (F.g + dir + ga) % ga;
+    w.classList.remove('turn-down', 'turn-up');
+    F.paintWheel();
+    void w.offsetWidth;
+    w.classList.add(dir > 0 ? 'turn-down' : 'turn-up');
+    clearTimeout(F.wt); F.wt = setTimeout(F.load, 350);
   };
   F.setCat = function (c) {
     if (c === F.cat) return;
@@ -1066,7 +1095,7 @@
   F.key = function (k) {
     var n = F.items.length, ga = F.genres.length;
     if (F.area === 'wheel') {
-      if (k === 'up' || k === 'down') { F.g = (F.g + (k === 'up' ? -1 : 1) + ga) % ga; F.paintWheel(); clearTimeout(F.wt); F.wt = setTimeout(F.load, 350); return; }
+      if (k === 'up' || k === 'down') { F.turn(k === 'up' ? -1 : 1); return; }
       if (k === 'right' || k === 'ok') { F.area = 'row'; F.paint(); }
       return;
     }
@@ -1074,6 +1103,7 @@
       if (k === 'left') { if (F.idx > 0) F.idx--; else F.area = 'wheel'; }
       else if (k === 'right') { if (F.idx < n - 1) F.idx++; }
       else if (k === 'up') F.area = 'play';
+      else if (k === 'down') { F.turn(1); return; } // nothing below the row: turn the wheel to the next genre
       else if (k === 'ok') { open(); return; }
       F.paint(); return;
     }
@@ -1082,6 +1112,7 @@
       if (k === 'left' && ci > 0) F.setCat(CATS[ci - 1]);
       else if (k === 'right') { if (ci < CATS.length - 1) F.setCat(CATS[ci + 1]); else { F.area = 'want'; F.paint(); } }
       else if (k === 'down' || k === 'ok') { F.area = 'play'; F.paint(); }
+      else if (k === 'up') F.turn(-1); // nothing above the tabs: turn the wheel back a genre
       return;
     }
     if (F.area === 'play') {
@@ -1209,7 +1240,7 @@
     home: function () { go('home'); H.first(); },
     resume: function () { loadPrefs(); resetIdle(); var t = top(); if (S[t].resume) S[t].resume(); tick(); },
     pause: function () { clearTimeout(idleT); clearTimeout(sleepT); [H, A, J, C].forEach(function (s) { if (s.orb) s.orb.stop(); }); },
-    appsChanged: function () { H.build(); },
+    appsChanged: function () { H.build();  setTimeout(relayPushAll, 1500); }, // installs/uninstalls: tell the phone page
     heard: function (text) { if (top() !== 'jarvis') go('jarvis', text); else J.hear(text); },
     heardPending: function () { var t = GH.takeHeard(); if (t) window.UI.heard(t); },
     voice: function (ev) {
