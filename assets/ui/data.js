@@ -19,7 +19,9 @@
       var id = 'c' + (++seq);
       pending[id] = { res: res, rej: rej };
       try { root.GH[method].apply(root.GH, [id].concat(args)); } catch (e) { delete pending[id]; rej(e); return; }
-      setTimeout(function () { if (pending[id]) { delete pending[id]; rej(new Error('timeout')); } }, 25000);
+      // Jarvis questions (fetch with a body: a POST to Ascend) may think for up to a minute.
+      var wait = method === 'fetch' && args[1] ? 60000 : 25000;
+      setTimeout(function () { if (pending[id]) { delete pending[id]; rej(new Error('timeout')); } }, wait);
     });
   };
   Data.get = function (url, body, maxAge) { return Data.call('fetch', url, body || '', maxAge || 0); };
