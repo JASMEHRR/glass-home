@@ -830,7 +830,7 @@
     if (!window.Relay) return;
     var installed = [];
     try { installed = JSON.parse(GH.installed()); } catch (e) { installed = []; }
-    Relay.push({ label: 'Glass Home', screen: top(), log: J.log.slice(-14), anilist: pref('anilist.user', ''), stremio: !!pref('stremio.key', ''),
+    Relay.push({ label: 'Glass Home', screen: top(), tv: GH.tvState ? GH.tvState() : '', log: J.log.slice(-14), anilist: pref('anilist.user', ''), stremio: !!pref('stremio.key', ''),
       apps: (live.apps || []).map(function (a) { return { id: a.id, label: a.label }; }), installed: installed, apkPage: GH.apkPage() });
   }
   function relayCmd(c) {
@@ -839,7 +839,7 @@
       if (c.k === 'play') GH.media('play_pause');
       else if (c.k === 'rew') GH.media('rewind');
       else if (c.k === 'ffwd') GH.media('fast_forward');
-      else if (/^(up|down|left|right|ok|back|home|menu|del)$/.test(c.k)) GH.remote(c.k, '');
+      else if (/^(up|down|left|right|ok|back|home|menu|del|volup|voldown|mute|power_on|power_off)$/.test(c.k)) GH.remote(c.k, '');
     } else if (c.t === 'type') GH.remote('type', String(c.text || '').slice(0, 200));
     else if (c.t === 'launch') {
       var app = (live.apps || []).filter(function (a) { return a.id === c.id; })[0];
@@ -1280,6 +1280,8 @@
     back: back,
     go: function (name, arg) { if (S[name]) go(name, arg); },
     home: function () { fromDream = false; go('home'); H.first(); },
+    // the Samsung TV link (TvControl): pairing and errors, shown here and on the phone page
+    tvNote: function (msg) { if (top() !== 'ambient') toast(String(msg || '')); if (window.Relay) Relay.push({ tv: String(msg || '') }); },
     dreamPending: function () { if (GH.takeDream && GH.takeDream()) { go('ambient'); fromDream = true; } },
     resume: function () { loadPrefs(); resetIdle(); var t = top(); if (S[t].resume) S[t].resume(); tick(); },
     pause: function () { clearTimeout(idleT); clearTimeout(sleepT); [H, A, J, C].forEach(function (s) { if (s.orb) s.orb.stop(); }); },

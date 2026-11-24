@@ -71,6 +71,9 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
       </div>
       <div class="row"><button data-k="back">Back</button><button data-k="home">Home</button><button data-k="menu">Menu</button></div>
       <div class="row"><button data-k="rew">&#9194;</button><button data-k="play">&#9199;</button><button data-k="ffwd">&#9193;</button></div>
+      <div class="row"><button data-k="voldown" aria-label="Volume down">Vol &minus;</button><button data-k="mute">Mute</button><button data-k="volup" aria-label="Volume up">Vol +</button></div>
+      <div class="row"><button data-k="power_off">TV off</button><button data-k="power_on">TV on</button></div>
+      <div class="state" id="tvstate"></div>
       <div class="state" id="rstate"></div>
     </div>
     <div class="card">
@@ -189,7 +192,10 @@ label { display: block; font-size: 12px; letter-spacing: .16em; font-weight: 700
   function showState(s) { $('rstate').textContent = STATES[s] || ('Remote problem: ' + s); }
   function key(k) {
     if (navigator.vibrate) navigator.vibrate(12);
-    post('/api/key', { k: k }).then(function (r) { showState(r.state); })
+    post('/api/key', { k: k }).then(function (r) {
+      showState(r.state);
+      if (/^(vol|mute|power)/.test(k)) setTimeout(function () { get('/api/tvstate').then(function (t) { $('tvstate').textContent = t.state || ''; }).catch(function () {}); }, 1500);
+    })
       .catch(function (e) { if (e.message === 'pin') needPin('Enter the PIN again.'); else showState('the TV did not answer'); });
   }
   Array.prototype.forEach.call(document.querySelectorAll('#remote [data-k]'), function (b) {

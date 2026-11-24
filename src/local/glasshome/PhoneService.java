@@ -130,12 +130,6 @@ public final class PhoneService extends Service {
         return on != null && on.contains(getPackageName() + "/") ? "ready" : "home";
     }
 
-    private void volume(String k) {
-        AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        int dir = "volup".equals(k) ? AudioManager.ADJUST_RAISE : "voldown".equals(k) ? AudioManager.ADJUST_LOWER : AudioManager.ADJUST_TOGGLE_MUTE;
-        am.adjustSuggestedStreamVolume(dir, AudioManager.USE_DEFAULT_STREAM_TYPE, AudioManager.FLAG_SHOW_UI);
-    }
-
     @Override
     public void onCreate() {
         super.onCreate();
@@ -312,10 +306,14 @@ public final class PhoneService extends Service {
                 String k = "/api/type".equals(path) ? "type" : q.getOrDefault("k", "");
                 String media = "play".equals(k) ? "play_pause" : "rew".equals(k) ? "rewind" : "ffwd".equals(k) ? "fast_forward" : null;
                 if (media != null) mediaKey(this, media);
-                else if (k.startsWith("vol") || "mute".equals(k)) volume(k);
                 else sendBroadcast(new Intent(this, RemoteReceiver.class).putExtra(RemoteReceiver.KEY, k)
                         .putExtra(RemoteReceiver.TEXT, q.getOrDefault("text", "").trim()));
                 send(out, 200, "application/json", new JSONObject().put("ok", true).put("state", remoteState())
+                        .toString().getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            if ("/api/tvstate".equals(path)) {
+                send(out, 200, "application/json", new JSONObject().put("state", Prefs.get(this).get(TvControl.STATE, ""))
                         .toString().getBytes(StandardCharsets.UTF_8));
                 return;
             }

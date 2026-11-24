@@ -251,6 +251,12 @@ final class Bridge {
         a.sendBroadcast(new Intent(a, RemoteReceiver.class).putExtra(RemoteReceiver.KEY, k).putExtra(RemoteReceiver.TEXT, text == null ? "" : text));
     }
 
+    /** The last word from the Samsung TV link (pairing, not found, ...), for the phone page. */
+    @JavascriptInterface
+    public String tvState() {
+        return store().get(TvControl.STATE, "");
+    }
+
     /** Apps the user installed, for the phone page's uninstall list: JSON [{id,label}]. */
     @JavascriptInterface
     public String installed() {

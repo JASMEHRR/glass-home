@@ -16,6 +16,11 @@ public final class RemoteReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent i) {
         String k = i.getStringExtra(KEY), t = i.getStringExtra(TEXT);
+        if (TvControl.handles(k)) { // the TV itself: volume, on, off
+            android.util.Log.i("GlassHome", "phone remote " + k + " for the TV");
+            TvControl.handle(c, k);
+            return;
+        }
         MainActivity m = MainActivity.current;
         if (m != null && m.resumed) {
             android.util.Log.i("GlassHome", "phone remote " + k + " on Glass Home");
