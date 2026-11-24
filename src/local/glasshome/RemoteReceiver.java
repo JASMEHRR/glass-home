@@ -16,6 +16,12 @@ public final class RemoteReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent i) {
         String k = i.getStringExtra(KEY), t = i.getStringExtra(TEXT);
+        if ("say".equals(k)) { // words for Jarvis from the phone
+            MainActivity m = MainActivity.current;
+            if (m != null) m.js("window.UI&&UI.heardSide(" + JSONObject.quote(t == null ? "" : t) + "," + m.resumed + ")");
+            else c.startActivity(new Intent(c, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra(PhoneService.HEARD, t));
+            return;
+        }
         if (TvControl.handles(k)) { // the TV itself: volume, on, off
             android.util.Log.i("GlassHome", "phone remote " + k + " for the TV");
             TvControl.handle(c, k);

@@ -287,9 +287,9 @@ public final class PhoneService extends Service {
                 if (media != null) {
                     mediaKey(this, media);
                 } else {
-                    startActivity(new Intent(this, MainActivity.class)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                            .putExtra(HEARD, text));
+                    // to Glass Home's process: Jarvis answers in the side panel over whatever is on screen
+                    sendBroadcast(new Intent(this, RemoteReceiver.class).putExtra(RemoteReceiver.KEY, "say")
+                            .putExtra(RemoteReceiver.TEXT, text));
                 }
                 send(out, 200, "application/json", new JSONObject().put("ok", true)
                         .put("done", media == null ? "sent" : media).toString().getBytes(StandardCharsets.UTF_8));

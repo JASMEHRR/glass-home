@@ -274,6 +274,20 @@ final class Bridge {
         return "https://" + PhoneService.lanAddress() + ":" + PhoneService.TLS_PORT + "/#apk=1&pin=" + PhoneService.pin(a);
     }
 
+    /** Jarvis's side panel over any app (SidePanel). False when Guard is off (no overlay possible). */
+    @JavascriptInterface
+    public boolean panel(String kind, String text) {
+        if (!Guard.isRunning()) return false;
+        a.runOnUiThread(() -> SidePanel.handle(kind, text));
+        return true;
+    }
+
+    /** Is Glass Home the app on screen? */
+    @JavascriptInterface
+    public boolean front() {
+        return a.resumed;
+    }
+
     /** Brings Glass Home to the front (Jarvis answers from the phone show and speak on the TV). */
     @JavascriptInterface
     public void showMe() {
@@ -380,7 +394,7 @@ final class Bridge {
      */
     static final String[] AMAZON_IDLE = {"com.amazon.venezia", "com.amazon.adep", "com.amazon.tv.settings.v2",
         "com.amazon.ftv.screensaver", "com.amazon.ssm", "com.amazon.gamehub", "com.amazon.tahoe", "com.amazon.cloud9",
-        "com.amazon.vizzini.ftvcds", "com.amazon.avod"};
+        "com.amazon.vizzini.ftvcds", "com.amazon.avod", "com.amazon.firebat"};
     private long trimmedAt;
 
     /** Quietly stops idle background apps (Amazon's idle ones too); at most every 5 minutes. */

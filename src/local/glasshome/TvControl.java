@@ -58,7 +58,7 @@ final class TvControl {
     }
 
     static boolean handles(String k) {
-        return k != null && k.matches("volup|voldown|mute|power_on|power_off");
+        return k != null && k.matches("volup|voldown|mute|power|power_on|power_off");
     }
 
     static void handle(Context c, String k) {
@@ -69,6 +69,11 @@ final class TvControl {
     private static void run(Context c, String k) {
         try {
             switch (k) {
+                case "power": { // the red button: whichever the TV is not
+                    String ip = Prefs.get(c).get("samsung.ip", "");
+                    if (!ip.isEmpty() && "on".equals(powerState(ip))) powerOff(c); else powerOn(c);
+                    break;
+                }
                 case "power_on": powerOn(c); break;
                 case "power_off": powerOff(c); break;
                 case "volup": samsung(c, "KEY_VOLUP"); break;

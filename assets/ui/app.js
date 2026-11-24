@@ -701,6 +701,7 @@
 
   // ---- Jarvis --------------------------------------------------------------------------------
   var J = { orb: null, log: [], busy: false, timer: 0 };
+  var side = false; // answering in the side panel (SidePanel.java) over another app, not on this screen
   S.jarvis = J;
   function jState(s) {
     var label = { listening: 'LISTENING', thinking: 'THINKING', speaking: 'SPEAKING' }[s];
@@ -749,8 +750,9 @@
   // Shows the reply on the TV and says it through the TV speakers (the shorter `spoken` line when
   // Ascend sends one). UI.voice('done') puts Jarvis back to listening after the voice ends.
   function reply(text, spoken) {
-    if (!text) { jState('listening'); return; }
+    if (!text) { jState('listening'); if (side) GH.panel('done', ''); return; }
     logLine('jarvis', text);
+    if (side) GH.panel('jarvis', text);
     showWords(text);
     clearTimeout(J.timer);
     if (pref('voice', 'on') !== 'off' && GH.speak(spoken || text)) {
@@ -758,6 +760,7 @@
       return;
     }
     J.timer = setTimeout(function () { jState('listening'); }, 5000);
+    if (side) GH.panel('done', '');
   }
   J.hear = function (text) {
     showWords(text);
@@ -780,12 +783,12 @@
     if (a.type === 'open') { reply(r.say); setTimeout(function () { GH.launch(a.id); }, 900); return; }
     if (a.type === 'search') { reply(r.say + ' Use the phone remote to pick one.'); setTimeout(function () { GH.searchIn(a.app, a.q); }, 900); return; }
     if (a.type === 'media') { GH.media(a.action); reply(r.say); return; }
-    if (a.type === 'screen') { back(); go(a.name); return; }
+    if (a.type === 'screen') { if (side) GH.showMe(); back(); go(a.name); return; }
     if (a.type === 'sleep') { reply(r.say); setTimeout(function () { if (!GH.sleep()) toast('Sleep works once Glass Home holds the Home button.'); }, 1500); return; }
     if (a.type === 'timer') { GH.sleepTimer(a.minutes); reply(r.say); return; }
     if (a.type === 'memory') { reply(r.say); Data.call('freeMemory').then(function (t) { reply('Freed ' + JSON.parse(t).freedMb + ' megabytes.'); }); return; }
     if (a.type === 'speed') { reply(r.say); Data.call('speedTest').then(function (t) { reply('About ' + JSON.parse(t).mbps + ' megabits per second.'); }).catch(function () { reply('The speed test failed.'); }); return; }
-    if (a.type === 'info') { reply(info(a.topic)); if (a.show) setTimeout(function () { back(); go('ambient'); go('expanded', a.topic === 'deadlines' ? 'deadlines' : 'weather'); }, 2500); return; }
+    if (a.type === 'info') { reply(info(a.topic)); if (a.show && !side) setTimeout(function () { back(); go('ambient'); go('expanded', a.topic === 'deadlines' ? 'deadlines' : 'weather'); }, 2500); return; }
     if (a.type === 'ask') { ask(a.text); return; }
     reply(r.say);
   }
@@ -819,7 +822,7 @@
       } else if (c.tool === 'searchStremio' && a.query) GH.searchIn('stremio', String(a.query));
       else if (c.tool === 'searchYouTube' && a.query) GH.searchIn('youtube', String(a.query));
       else if (c.tool === 'media' && /^(play|pause|next|previous)$/.test(a.action)) GH.media(a.action);
-      else if (c.tool === 'showScreen' && /^(home|foryou|ambient|command|settings)$/.test(a.screen)) { back(); go(a.screen); }
+      else if (c.tool === 'showScreen' && /^(home|foryou|ambient|command|settings)$/.test(a.screen)) { if (side) GH.showMe(); back(); go(a.screen); }
       else if (c.tool === 'sleepTimer' && +a.minutes >= 0) GH.sleepTimer(+a.minutes);
     });
   }
@@ -839,14 +842,13 @@
       if (c.k === 'play') GH.media('play_pause');
       else if (c.k === 'rew') GH.media('rewind');
       else if (c.k === 'ffwd') GH.media('fast_forward');
-      else if (/^(up|down|left|right|ok|back|home|menu|del|volup|voldown|mute|power_on|power_off)$/.test(c.k)) GH.remote(c.k, '');
+      else if (/^(up|down|left|right|ok|back|home|menu|del|volup|voldown|mute|power|power_on|power_off)$/.test(c.k)) GH.remote(c.k, '');
     } else if (c.t === 'type') GH.remote('type', String(c.text || '').slice(0, 200));
     else if (c.t === 'launch') {
       var app = (live.apps || []).filter(function (a) { return a.id === c.id; })[0];
       if (app) GH.launch(app.id);
     } else if (c.t === 'say' && c.text) {
-      GH.showMe();
-      setTimeout(function () { window.UI.heard(String(c.text).slice(0, 500)); }, 400);
+      window.UI.heardSide(String(c.text).slice(0, 500), GH.front ? GH.front() : false);
     } else if (c.t === 'setting' && c.key === 'anilist.user' && /^[A-Za-z0-9_-]{0,40}$/.test(String(c.value || ''))) {
       setPref('anilist.user', String(c.value || ''));
       relayPushAll();
@@ -1287,10 +1289,24 @@
     pause: function () { clearTimeout(idleT); clearTimeout(sleepT); [H, A, J, C].forEach(function (s) { if (s.orb) s.orb.stop(); }); },
     appsChanged: function () { H.build();  setTimeout(relayPushAll, 1500); }, // installs/uninstalls: tell the phone page
     heard: function (text) { if (top() !== 'jarvis') go('jarvis', text); else J.hear(text); },
+    // From the phone: on the Jarvis screen it answers there; anywhere else in the side panel, so the
+    // app on screen (a video, Stremio) stays. Without Guard there is no panel: the Jarvis screen opens.
+    heardSide: function (text, front) {
+      text = String(text || '').trim();
+      if (!text) return;
+      if (front && top() === 'jarvis') { side = false; J.hear(text); return; }
+      if (!GH.panel || !GH.panel('you', text)) { GH.showMe(); setTimeout(function () { window.UI.heard(text); }, 400); return; }
+      side = true;
+      J.hear(text);
+    },
     // Android's installer finished (ApkInstaller): say so on whatever Glass Home screen is up.
     installed: function (msg) { toast(String(msg || '')); if (GH.showMe) GH.showMe(); setTimeout(relayPushAll, 1500); },
     heardPending: function () { var t = GH.takeHeard(); if (t) window.UI.heard(t); },
     voice: function (ev) {
+      if (side) {
+        if (ev === 'start') GH.panel('state', 'speaking');
+        else { GH.panel('done', ''); side = false; }
+      }
       if (top() !== 'jarvis') return;
       if (ev === 'start') jState('speaking');
       else { jState('listening'); }

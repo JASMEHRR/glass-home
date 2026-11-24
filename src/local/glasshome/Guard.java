@@ -36,7 +36,7 @@ public final class Guard extends AccessibilityService {
     private static final long LAUNCH_FALLBACK_MS = 150;
 
     private static volatile boolean paused;
-    private static volatile Guard running;
+    static volatile Guard running;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable uncover = this::uncover;
