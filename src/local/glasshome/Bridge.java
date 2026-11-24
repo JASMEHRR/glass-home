@@ -479,6 +479,13 @@ final class Bridge {
         return String.valueOf(at);
     }
 
+    /** Is a video or music playing right now (in any app)? Jarvis then answers small and pauses it. */
+    @JavascriptInterface
+    public boolean playing() {
+        android.media.AudioManager am = (android.media.AudioManager) a.getSystemService(Context.AUDIO_SERVICE);
+        return am != null && am.isMusicActive();
+    }
+
     /** play_pause, play, pause, next, previous: sent to whatever is playing. */
     @JavascriptInterface
     public void media(String action) {

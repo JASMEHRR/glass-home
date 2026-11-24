@@ -102,6 +102,9 @@ public final class MainActivity extends Activity {
         dream(getIntent());
     }
 
+    /** Extra: a screen to open on arrival (Guard's hold-Home opens "command"). */
+    static final String OPEN = "open";
+
     private volatile String pendingHeard;
     private volatile boolean pendingDream;
 
@@ -201,7 +204,16 @@ public final class MainActivity extends Activity {
     protected void onStart() {
         super.onStart();
         ui.removeCallbacks(trim);
-        if (web != null) web.setVisibility(View.VISIBLE);
+        if (web != null) {
+            web.setVisibility(View.VISIBLE);
+            final long t0 = android.os.SystemClock.uptimeMillis();
+            web.postVisualStateCallback(t0, new android.webkit.WebView.VisualStateCallback() {
+                @Override
+                public void onComplete(long id) {
+                    android.util.Log.i("GlassHome", "home drawn " + (android.os.SystemClock.uptimeMillis() - t0) + " ms after start");
+                }
+            });
+        }
     }
 
     @Override
@@ -213,6 +225,7 @@ public final class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         if (intent != null && intent.hasExtra(PhoneService.HEARD)) heard(intent);
+        else if (intent != null && "command".equals(intent.getStringExtra(OPEN))) js("window.UI&&(UI.home(),UI.go('command'))");
         else if (!dream(intent)) js("window.UI&&UI.home()");
     }
 

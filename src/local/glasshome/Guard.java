@@ -12,6 +12,7 @@ import android.graphics.PixelFormat;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
@@ -45,6 +46,10 @@ public final class Guard extends AccessibilityService {
     private final Runnable retry = this::retryHome;
     private View cover;
     private boolean onAmazonHome;
+    // the remote's Home button, caught before Fire OS sees it (hold = Glass Home's Command Center)
+    private static final long HOLD_MS = 600;
+    private boolean homeHeld;
+    private final Runnable holdHome = () -> { homeHeld = true; openHome("command"); };
     private final BroadcastReceiver screenOn = new BroadcastReceiver() {
         @Override
         public void onReceive(Context c, Intent i) {
@@ -283,6 +288,43 @@ public final class Guard extends AccessibilityService {
     private void uncover() {
         handler.removeCallbacks(uncover);
         if (cover != null) cover.setVisibility(View.GONE);
+    }
+
+    /**
+     * Home goes straight to Glass Home. Letting it through made Fire OS start Amazon's home first
+     * (about 2 seconds of a heavy app loading), which Guard then had to cover and replace.
+     */
+    @Override
+    protected boolean onKeyEvent(KeyEvent e) {
+        if (e.getKeyCode() == KeyEvent.KEYCODE_HOME)
+            android.util.Log.i("GlassHome", "guard: home key " + (e.getAction() == KeyEvent.ACTION_DOWN ? "down" : "up") + (paused ? " (paused)" : ""));
+        if (e.getKeyCode() != KeyEvent.KEYCODE_HOME || paused) return false;
+        if (e.getAction() == KeyEvent.ACTION_DOWN) {
+            if (e.getRepeatCount() == 0) {
+                homeHeld = false;
+                handler.postDelayed(holdHome, HOLD_MS);
+            }
+            return true;
+        }
+        if (e.getAction() == KeyEvent.ACTION_UP) {
+            handler.removeCallbacks(holdHome);
+            if (!homeHeld) openHome(null);
+            homeHeld = false;
+        }
+        return true;
+    }
+
+    /** Glass Home in front now; screen is a page to show on it (command), or null for Home itself. */
+    private void openHome(String screen) {
+        Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                .setClass(this, MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        if (screen != null) i.putExtra(MainActivity.OPEN, screen);
+        try {
+            startActivity(i, ActivityOptions.makeCustomAnimation(this, 0, 0).toBundle());
+        } catch (RuntimeException ex) {
+            performGlobalAction(GLOBAL_ACTION_HOME); // the old way: Amazon's home, then replaced
+        }
     }
 
     @Override

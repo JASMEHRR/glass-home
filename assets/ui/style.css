@@ -178,8 +178,10 @@ canvas { will-change: transform; }
 #jarvis .bg { filter: none; }
 #jarvis .dim { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 42%, rgba(2,4,10,.4), rgba(2,4,10,.88) 70%); }
 #jarvis .orbbig { position: absolute; left: 660px; top: 90px; width: 600px; height: 600px; }
-#jarvis.on .orbbig { animation: fly .8s var(--ease-out) backwards; }
-@keyframes fly { from { transform: translate(790px,514px) scale(.33); opacity: .6; } to { transform: none; opacity: 1; } }
+/* the big orb grows out of the orb that was on screen (dock or screensaver; app.js jarvisExpand),
+   a moment after the screen shows so the TV has drawn it */
+#jarvis.on .orbbig { animation: fly .85s var(--ease-out) .4s backwards; }
+@keyframes fly { from { transform: translate(var(--fx, 790px), var(--fy, 514px)) scale(var(--fs, .33)); opacity: .6; } to { transform: none; opacity: 1; } }
 #jarvis canvas { width: 600px; height: 600px; }
 #jarvis .state { position: absolute; left: 0; right: 0; top: 716px; text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 17px; letter-spacing: .34em; color: #7dd3fc; transition: color .4s; }
 #jarvis .words { position: absolute; left: 240px; right: 240px; top: 790px; text-align: center; font-weight: 600; font-size: 44px; line-height: 1.35; color: rgba(255,255,255,.92); min-height: 120px; }

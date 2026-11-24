@@ -702,6 +702,30 @@
   // ---- Jarvis --------------------------------------------------------------------------------
   var J = { orb: null, log: [], busy: false, timer: 0 };
   var side = false; // answering in the side panel (SidePanel.java) over another app, not on this screen
+  var resumeAfter = false; // Jarvis paused a video to answer: play it again when the answer is done
+  function sideDone() {
+    GH.panel('done', '');
+    side = false;
+    if (resumeAfter) { resumeAfter = false; setTimeout(function () { GH.media('play'); }, 700); }
+  }
+  /** Where the orb on screen is (the dock's on Home, the screensaver's), in stage pixels. */
+  function orbOrigin() {
+    var src = top() === 'ambient' ? $('ambOrb') : top() === 'home' ? $('dockOrb') : null;
+    var s = window.stageScale || 1, st = $('jarvis').getBoundingClientRect();
+    if (src && src.offsetWidth) {
+      var r = src.getBoundingClientRect();
+      return { x: Math.round((r.left + r.width / 2 - st.left) / s), y: Math.round((r.top + r.height / 2 - st.top) / s), s: Math.max(0.1, r.width / s / 600) };
+    }
+    return { x: 1830, y: 990, s: 0.15 }; // bottom-right corner, where the small Jarvis lives
+  }
+  /** Opens the Jarvis screen with its big orb growing out of the orb that was on screen. */
+  function jarvisExpand(o, open) {
+    var el = $('jarvis');
+    el.style.setProperty('--fx', (o.x - 960) + 'px'); el.style.setProperty('--fy', (o.y - 390) + 'px');
+    el.style.setProperty('--fs', String(o.s || 0.18));
+    open();
+  }
+
   S.jarvis = J;
   function jState(s) {
     var label = { listening: 'LISTENING', thinking: 'THINKING', speaking: 'SPEAKING' }[s];
@@ -750,7 +774,7 @@
   // Shows the reply on the TV and says it through the TV speakers (the shorter `spoken` line when
   // Ascend sends one). UI.voice('done') puts Jarvis back to listening after the voice ends.
   function reply(text, spoken) {
-    if (!text) { jState('listening'); if (side) GH.panel('done', ''); return; }
+    if (!text) { jState('listening'); if (side) sideDone(); return; }
     logLine('jarvis', text);
     if (side) GH.panel('jarvis', text);
     showWords(text);
@@ -760,7 +784,7 @@
       return;
     }
     J.timer = setTimeout(function () { jState('listening'); }, 5000);
-    if (side) GH.panel('done', '');
+    if (side) sideDone();
   }
   J.hear = function (text) {
     showWords(text);
@@ -780,6 +804,7 @@
   }
   function act(r) {
     var a = r.act || {};
+    if (/^(open|search|screen|media|sleep)$/.test(a.type)) resumeAfter = false; // you asked for something else
     if (a.type === 'open') { reply(r.say); setTimeout(function () { GH.launch(a.id); }, 900); return; }
     if (a.type === 'search') { reply(r.say + ' Use the phone remote to pick one.'); setTimeout(function () { GH.searchIn(a.app, a.q); }, 900); return; }
     if (a.type === 'media') { GH.media(a.action); reply(r.say); return; }
@@ -1295,8 +1320,18 @@
       text = String(text || '').trim();
       if (!text) return;
       if (front && top() === 'jarvis') { side = false; J.hear(text); return; }
-      if (!GH.panel || !GH.panel('you', text)) { GH.showMe(); setTimeout(function () { window.UI.heard(text); }, 400); return; }
-      side = true;
+      // Nothing playing: the orb on screen grows into the big Jarvis screen.
+      var playing = GH.playing ? GH.playing() : false;
+      if (!playing || !GH.panel || !GH.panel('you', text)) {
+        side = false; resumeAfter = false;
+        var o = front ? orbOrigin() : { x: 1830, y: 990 };
+        if (!front) GH.showMe();
+        setTimeout(function () { jarvisExpand(o, function () { go('jarvis', text); }); }, front ? 0 : 450);
+        return;
+      }
+      // A video is playing: pause it, answer small in the corner, then play it again.
+      side = true; resumeAfter = true;
+      GH.media('pause');
       J.hear(text);
     },
     // Android's installer finished (ApkInstaller): say so on whatever Glass Home screen is up.
@@ -1305,7 +1340,7 @@
     voice: function (ev) {
       if (side) {
         if (ev === 'start') GH.panel('state', 'speaking');
-        else { GH.panel('done', ''); side = false; }
+        else sideDone();
       }
       if (top() !== 'jarvis') return;
       if (ev === 'start') jState('speaking');
