@@ -87,6 +87,15 @@ final class Bridge {
                     @Override
                     public void onStart(String id) {
                         a.js("window.UI&&UI.voice('start')");
+                        // Pico talks at about 14 letters a second: the answer appears at that pace
+                        final int n = picoWords.length();
+                        a.runOnUiThread(() -> SidePanel.speaking(n * 70L));
+                    }
+
+                    @Override
+                    public void onRangeStart(String id, int start, int end, int frame) {
+                        final int n = picoWords.length();
+                        a.runOnUiThread(() -> SidePanel.spokenUpTo(end, n));
                     }
 
                     @Override
@@ -550,6 +559,7 @@ final class Bridge {
             player = p;
             p.start();
             a.js("window.UI&&UI.voice('start')");
+            SidePanel.speaking(p.getDuration()); // the answer appears along with Ascend's voice
             return true;
         } catch (IOException | RuntimeException e) {
             stopPlayer();
@@ -569,8 +579,11 @@ final class Bridge {
         }
     }
 
+    private volatile String picoWords = "";
+
     private boolean localSpeak(String words) {
         if (!ttsReady) return false;
+        picoWords = words;
         tts.setLanguage(Locale.UK);
         return tts.speak(words, TextToSpeech.QUEUE_FLUSH, new Bundle(), "j" + SystemClock.uptimeMillis()) == TextToSpeech.SUCCESS;
     }
