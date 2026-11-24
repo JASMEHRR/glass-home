@@ -69,13 +69,8 @@ final class TvControl {
     private static void run(Context c, String k) {
         try {
             switch (k) {
-                case "power_on":
-                    wake(c);
-                    wol(c);
-                    break;
-                case "power_off":
-                    if (!Guard.sleep()) samsung(c, "KEY_POWER");
-                    break;
+                case "power_on": powerOn(c); break;
+                case "power_off": powerOff(c); break;
                 case "volup": samsung(c, "KEY_VOLUP"); break;
                 case "voldown": samsung(c, "KEY_VOLDOWN"); break;
                 case "mute": samsung(c, "KEY_MUTE"); break;
@@ -88,6 +83,70 @@ final class TvControl {
     }
 
     // ---- on / off ----
+    // The Fire TV's HDMI-CEC does not switch this Samsung TV, so the TV is told directly: its power
+    // key over the network remote, and Wake-on-LAN when it is fully off (network asleep).
+
+    private static void powerOff(Context c) throws IOException {
+        String ip = Prefs.get(c).get("samsung.ip", "");
+        String st = ip.isEmpty() ? null : powerState(ip);
+        if ("on".equals(st) || ip.isEmpty()) {
+            samsung(c, "KEY_POWER");
+            note(c, "TV off");
+        } else {
+            note(c, "The TV is already off");
+        }
+        close();
+        // The Fire TV stays awake so "TV on" reaches it from anywhere; Glass Home's own sleep timer
+        // puts it to sleep after its idle time.
+    }
+
+    private static void powerOn(Context c) throws IOException {
+        wake(c);
+        String ip = Prefs.get(c).get("samsung.ip", "");
+        if (ip.isEmpty()) { samsung(c, "KEY_VOLUP"); return; } // first time: find and pair the TV
+        String st = powerState(ip);
+        for (int i = 0; st == null && i < 20; i++) { // fully off: wake its network, then wait for it
+            if (i % 4 == 0) wol(c, ip);
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            st = powerState(ip);
+        }
+        if (st == null) {
+            note(c, "The TV did not wake. On the TV: Settings > General > Network > Expert Settings > Power On with Mobile");
+            return;
+        }
+        if (!"on".equals(st)) {
+            close();
+            samsung(c, "KEY_POWER");
+        }
+        note(c, "TV on");
+    }
+
+    /** "on", "standby" (screen off, network awake) or null when the TV does not answer. */
+    static String powerState(String ip) {
+        HttpURLConnection h = null;
+        try {
+            h = (HttpURLConnection) new URL("http://" + ip + ":8001/api/v2/").openConnection();
+            h.setConnectTimeout(800);
+            h.setReadTimeout(1500);
+            if (h.getResponseCode() != 200) return null;
+            ByteArrayOutputStream b = new ByteArrayOutputStream();
+            try (InputStream s = h.getInputStream()) {
+                byte[] buf = new byte[4096];
+                for (int n; (n = s.read(buf)) > 0 && b.size() < 65536; ) b.write(buf, 0, n);
+            }
+            JSONObject d = new JSONObject(b.toString("UTF-8")).optJSONObject("device");
+            return d == null ? null : d.optString("PowerState", "on").toLowerCase(java.util.Locale.ROOT);
+        } catch (IOException | org.json.JSONException e) {
+            return null;
+        } finally {
+            if (h != null) h.disconnect();
+        }
+    }
 
     @SuppressWarnings("deprecation")
     private static void wake(Context c) {
@@ -98,7 +157,7 @@ final class TvControl {
     }
 
     /** Wake-on-LAN to the Samsung TV (if its address was seen before), for when it was turned off by its own remote. */
-    private static void wol(Context c) {
+    private static void wol(Context c, String ip) {
         String mac = Prefs.get(c).get("samsung.mac", "");
         if (!mac.matches("([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}")) return;
         byte[] m = new byte[6];
@@ -109,7 +168,10 @@ final class TvControl {
         for (int i = 6; i < p.length; i++) p[i] = m[(i - 6) % 6];
         try (DatagramSocket s = new DatagramSocket()) {
             s.setBroadcast(true);
-            s.send(new DatagramPacket(p, p.length, InetAddress.getByName("255.255.255.255"), 9));
+            String net = ip.substring(0, ip.lastIndexOf('.') + 1) + "255";
+            for (String to : new String[]{"255.255.255.255", net, ip}) {
+                for (int port : new int[]{9, 7}) s.send(new DatagramPacket(p, p.length, InetAddress.getByName(to), port));
+            }
         } catch (IOException e) {
             Log.w(TAG, "wol: " + e);
         }
