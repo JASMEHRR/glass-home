@@ -175,6 +175,35 @@ public final class MainActivity extends Activity {
         if (web != null) web.onPause();
     }
 
+    /**
+     * Behind another app (YouTube, Stremio), Glass Home lets go of its pictures. Its process always
+     * counts as "foreground" (Guard lives in it), so Android never asks it to free memory; it would
+     * keep ~60 MB of page tiles while a video app needs them. The page keeps running (the phone
+     * relay and Jarvis), it just stops drawing until Home comes back.
+     */
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (web == null) return;
+        // hidden, it draws nothing (the clock would otherwise keep re-creating what the trim freed)
+        web.setVisibility(View.INVISIBLE);
+        ui.postDelayed(trim, 1500); // after the app on top has drawn
+    }
+
+    private final Runnable trim = () -> {
+        if (resumed || web == null) return;
+        // reaches the WebView's own memory callbacks: drops its tiles and decoded-image caches
+        getApplication().onTrimMemory(TRIM_MEMORY_BACKGROUND);
+        getApplication().onTrimMemory(TRIM_MEMORY_RUNNING_CRITICAL);
+    };
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        ui.removeCallbacks(trim);
+        if (web != null) web.setVisibility(View.VISIBLE);
+    }
+
     @Override
     public void onEnterAnimationComplete() {
         Guard.shown();
