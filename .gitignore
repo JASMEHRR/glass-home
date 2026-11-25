@@ -2,3 +2,6 @@ build/
 dist/
 keystore/
 *.tmp
+
+# third-party builds stay local
+*.apk
